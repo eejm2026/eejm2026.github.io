@@ -225,6 +225,7 @@ details.dbg summary{cursor:pointer;font-size:12.5px;font-weight:600;color:var(--
   width:6mm;height:6mm;border:1pt solid #000;border-radius:50%;
   font-size:6.5pt;display:flex;align-items:center;justify-content:center;color:#777;flex-shrink:0;
 }
+.bubble.cheia{background:#000;box-shadow:inset 0 0 0 6mm #000;}
 .slip-foot{margin-top:2.5mm;padding:1.5mm 4mm 0;border-top:.8pt solid #000;font-size:6.5pt;display:flex;justify-content:space-between;gap:3mm;}
 
 @media print{
@@ -286,6 +287,31 @@ details.dbg summary{cursor:pointer;font-size:12.5px;font-weight:600;color:var(--
 
 <!-- ============ 1. PROVA ============ -->
 <div class="screen active" id="screen-prova">
+  <section>
+    <h2 class="section-title">📚 Minhas provas</h2>
+    <div class="card">
+      <div class="field">
+        <label for="fProvaSel">Prova em que você está trabalhando</label>
+        <select id="fProvaSel"></select>
+        <div class="field-hint">Cada prova guarda o próprio formato, gabarito e turma. Trocar aqui troca tudo — inclusive o que a correção espera encontrar.</div>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-secondary" id="btnNovaProva" type="button">+ Nova prova</button>
+        <button class="btn btn-outline" id="btnDuplicarProva" type="button">Duplicar</button>
+        <button class="btn btn-danger" id="btnExcluirProva" type="button">Excluir esta</button>
+      </div>
+      <div class="box box-blue" style="margin-top:16px">
+        <b>Arquivo da prova</b>
+        Guarde o arquivo junto da prova, no Drive ou no computador. Ele carrega o formato, o gabarito, a turma e os códigos dos alunos — serve para corrigir em outro aparelho, para recuperar se os dados do navegador forem limpos, e para passar a correção a um colega.
+        <div class="btn-row" style="margin-top:10px">
+          <button class="btn btn-primary" id="btnExportar" type="button">💾 Salvar arquivo desta prova</button>
+          <label class="btn btn-secondary" for="fImportar">📂 Abrir arquivo de prova</label>
+          <input type="file" id="fImportar" accept=".json,application/json" hidden>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <section>
     <h2 class="section-title">📋 Dados da avaliação</h2>
     <div class="card">
@@ -426,6 +452,7 @@ details.dbg summary{cursor:pointer;font-size:12.5px;font-weight:600;color:var(--
         <div class="btn-row" style="margin-top:0">
           <button class="btn btn-outline modo-btn" id="btnModoNominal" data-modo="nominal" type="button">Com o nome de cada aluno</button>
           <button class="btn btn-outline modo-btn" id="btnModoBranco" data-modo="branco" type="button">Todos em branco</button>
+          <button class="btn btn-outline modo-btn" id="btnModoMascara" data-modo="mascara" type="button">Folha-máscara de correção</button>
         </div>
         <div class="field-hint" id="modoHint">—</div>
       </div>
@@ -502,7 +529,10 @@ details.dbg summary{cursor:pointer;font-size:12.5px;font-weight:600;color:var(--
 (function(){
 "use strict";
 var LETRAS=["A","B","C","D","E"];
-var KEY="corretorJM_v1";
+var KEY="corretorJM_v2";
+var KEY_ANTIGA="corretorJM_v1";
+/* acervo = todas as provas do professor + a escola, que é comum a todas */
+var acervo={escola:{nome:"",contato:"",logo:"",logoRede:""},atual:0,provas:[]};
 
 var st={
   atividade:"",disciplina:"",professor:"",bimestre:"",turma:"",data:"",
@@ -541,16 +571,69 @@ function escolaAtual(){
 }
 
 /* ---------- persistencia ---------- */
-function save(){try{localStorage.setItem(KEY,JSON.stringify(st));}catch(e){}}
+function provaVazia(){
+  return {atividade:"",disciplina:"",professor:"",bimestre:"",turma:"",data:"",
+    nq:10,nalt:5,notaMax:10,gabarito:[],anuladas:[],alunos:[],atual:0,
+    modoFolha:"nominal",extras:3,avulsos:30,tela:"prova",aguardandoFoto:false};
+}
+function instantaneo(){
+  var c={};
+  for(var k in st){if(k!=="escola")c[k]=st[k];}
+  return JSON.parse(JSON.stringify(c));
+}
+function save(){
+  if(!acervo.provas.length)acervo.provas=[provaVazia()];
+  if(acervo.atual>=acervo.provas.length)acervo.atual=acervo.provas.length-1;
+  acervo.provas[acervo.atual]=instantaneo();
+  acervo.escola=st.escola;
+  try{localStorage.setItem(KEY,JSON.stringify(acervo));}catch(e){}
+}
+function aplicarProva(p){
+  var nova=provaVazia();
+  for(var k in nova){if(Object.prototype.hasOwnProperty.call(p,k))nova[k]=p[k];}
+  nova.escola=acervo.escola||{nome:"",contato:"",logo:"",logoRede:""};
+  st=nova;
+}
 function load(){
+  var raw=null;
+  try{raw=localStorage.getItem(KEY);}catch(e){}
+  if(raw){
+    try{
+      var o=JSON.parse(raw);
+      if(o&&o.provas&&o.provas.length){
+        acervo=o;
+        if(!acervo.escola)acervo.escola={nome:"",contato:"",logo:"",logoRede:""};
+        if(!(acervo.atual>=0&&acervo.atual<acervo.provas.length))acervo.atual=0;
+        aplicarProva(acervo.provas[acervo.atual]);
+        return true;
+      }
+    }catch(e){}
+  }
+  /* migração da versão anterior, que guardava uma prova só */
   try{
-    var raw=localStorage.getItem(KEY);
-    if(!raw)return false;
-    var o=JSON.parse(raw);
-    if(!o||typeof o!=="object")return false;
-    for(var k in st){if(Object.prototype.hasOwnProperty.call(o,k))st[k]=o[k];}
-    return true;
-  }catch(e){return false;}
+    var antigo=localStorage.getItem(KEY_ANTIGA);
+    if(antigo){
+      var a=JSON.parse(antigo);
+      if(a&&typeof a==="object"){
+        acervo.escola=a.escola||acervo.escola;
+        acervo.provas=[a];acervo.atual=0;
+        aplicarProva(a);save();
+        return true;
+      }
+    }
+  }catch(e){}
+  acervo.provas=[provaVazia()];acervo.atual=0;
+  aplicarProva(acervo.provas[0]);
+  return false;
+}
+function rotuloProva(p){
+  var partes=[];
+  if(p.atividade)partes.push(p.atividade);
+  if(p.disciplina)partes.push(p.disciplina);
+  if(p.turma)partes.push(p.turma);
+  var t=partes.join(" · ");
+  if(!t)t="Prova sem nome";
+  return t+"  ("+p.nq+" questões · "+(p.alunos?p.alunos.length:0)+" alunos)";
 }
 
 /* ---------- utilidades ---------- */
@@ -600,6 +683,99 @@ function irPara(nome){
 }
 document.querySelectorAll(".nav-btn").forEach(function(b){
   b.addEventListener("click",function(){irPara(b.dataset.screen);});
+});
+
+/* ---------- acervo de provas ---------- */
+function renderSeletorProvas(){
+  var sel=$("fProvaSel");sel.innerHTML="";
+  acervo.provas.forEach(function(p,i){
+    var o=document.createElement("option");
+    o.value=String(i);o.textContent=(i+1)+". "+rotuloProva(p);
+    if(i===acervo.atual)o.selected=true;
+    sel.appendChild(o);
+  });
+  $("btnExcluirProva").disabled=acervo.provas.length<2;
+}
+function recarregarTudo(){
+  ajustarTamanhos();preencherForm();renderSeletorProvas();
+  renderGabarito();atualizarCabecalho();
+}
+$("fProvaSel").addEventListener("change",function(){
+  save();
+  acervo.atual=parseInt(this.value,10);
+  aplicarProva(acervo.provas[acervo.atual]);
+  save();recarregarTudo();
+});
+$("btnNovaProva").addEventListener("click",function(){
+  save();
+  acervo.provas.push(provaVazia());
+  acervo.atual=acervo.provas.length-1;
+  aplicarProva(acervo.provas[acervo.atual]);
+  save();recarregarTudo();irPara("prova");
+});
+$("btnDuplicarProva").addEventListener("click",function(){
+  save();
+  var copia=JSON.parse(JSON.stringify(acervo.provas[acervo.atual]));
+  copia.alunos=[];copia.atual=0;copia.turma="";
+  acervo.provas.push(copia);
+  acervo.atual=acervo.provas.length-1;
+  aplicarProva(copia);save();recarregarTudo();
+  alert("Prova duplicada com o mesmo formato e gabarito. A turma ficou vazia para você colar a lista da outra turma.");
+});
+$("btnExcluirProva").addEventListener("click",function(){
+  if(acervo.provas.length<2)return;
+  if(!confirm("Excluir \""+rotuloProva(acervo.provas[acervo.atual])+"\"? As notas desta prova serão perdidas."))return;
+  acervo.provas.splice(acervo.atual,1);
+  if(acervo.atual>=acervo.provas.length)acervo.atual=acervo.provas.length-1;
+  aplicarProva(acervo.provas[acervo.atual]);
+  save();recarregarTudo();
+});
+
+function nomeArquivo(){
+  var base=[st.atividade,st.disciplina,st.turma].filter(Boolean).join("-")||"prova";
+  return base.normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^A-Za-z0-9\-]+/g,"-")
+    .replace(/-+/g,"-").replace(/^-|-$/g,"").toLowerCase()+".corretorjm.json";
+}
+$("btnExportar").addEventListener("click",function(){
+  save();
+  var pacote={
+    formato:"corretor-gabaritos-jm",versao:2,
+    gerado:new Date().toISOString(),
+    escola:{nome:(st.escola||{}).nome||"",contato:(st.escola||{}).contato||""},
+    prova:instantaneo()
+  };
+  var txt=JSON.stringify(pacote,null,1);
+  var blob=new Blob([txt],{type:"application/json"});
+  var url=URL.createObjectURL(blob);
+  var a=document.createElement("a");
+  a.href=url;a.download=nomeArquivo();
+  document.body.appendChild(a);a.click();
+  setTimeout(function(){document.body.removeChild(a);URL.revokeObjectURL(url);},400);
+  var b=this,antes=b.textContent;
+  b.textContent="✅ Arquivo gerado";b.classList.add("done");
+  setTimeout(function(){b.textContent=antes;b.classList.remove("done");},2500);
+});
+$("fImportar").addEventListener("change",function(){
+  var f=this.files&&this.files[0];
+  var inp=this;
+  if(!f)return;
+  var fr=new FileReader();
+  fr.onload=function(){
+    inp.value="";
+    var pac;
+    try{pac=JSON.parse(fr.result);}catch(e){alert("Este arquivo não é um arquivo de prova válido.");return;}
+    if(!pac||pac.formato!=="corretor-gabaritos-jm"||!pac.prova){
+      alert("Este arquivo não foi gerado pelo Corretor de Gabaritos.");return;
+    }
+    save();
+    acervo.provas.push(pac.prova);
+    acervo.atual=acervo.provas.length-1;
+    aplicarProva(pac.prova);
+    save();recarregarTudo();irPara("prova");
+    alert("Prova carregada: "+rotuloProva(pac.prova));
+  };
+  fr.onerror=function(){inp.value="";alert("Não consegui ler o arquivo.");};
+  fr.readAsText(f);
 });
 
 /* ---------- 1. PROVA ---------- */
@@ -708,12 +884,11 @@ $("btnSalvarProva").addEventListener("click",function(){
   ajustarTamanhos();save();atualizarCabecalho();irPara("gabarito");
 });
 $("btnZerar").addEventListener("click",function(){
-  if(!confirm("Isso apaga a prova, os alunos e todas as respostas salvas neste navegador. A configuração da escola é mantida. Continuar?"))return;
+  if(!confirm("Isso limpa APENAS a prova selecionada — dados, gabarito, alunos e notas dela. As outras provas e a configuração da escola são mantidas. Continuar?"))return;
   var escola=st.escola;
-  st={atividade:"",disciplina:"",professor:"",bimestre:"",turma:"",data:"",
-      nq:10,nalt:5,notaMax:10,gabarito:[],anuladas:[],alunos:[],atual:0,
-      modoFolha:"nominal",extras:3,avulsos:30,escola:escola};
-  ajustarTamanhos();save();preencherForm();$("fAlunos").value="";irPara("prova");
+  aplicarProva(provaVazia());
+  st.escola=escola;
+  save();recarregarTudo();$("fAlunos").value="";irPara("prova");
 });
 
 /* ---------- 2. GABARITO ---------- */
@@ -804,10 +979,10 @@ function partesAluno(txt){
   if(m)return {num:m[1],nome:m[2].trim()};
   return {num:"",nome:String(txt||"").trim()};
 }
-function slipHTML(aluno){
+function slipHTML(aluno,mascara){
   var L=layoutFolha();
   var E=escolaAtual();
-  var p=aluno?partesAluno(aluno.nome):{num:"",nome:""};
+  var p=mascara?{num:"",nome:"GABARITO — RESPOSTAS CERTAS"}:(aluno?partesAluno(aluno.nome):{num:"",nome:""});
   var h='<div class="slip">'+
     svgMarcador("slip-mark tl")+svgMarcador("slip-mark tr")+
     svgMarcador("slip-mark bl")+svgMarcador("slip-mark br")+
@@ -831,7 +1006,11 @@ function slipHTML(aluno){
       '<div class="slip-field f-data">Data:</div>'+
     '</div>'+
     '<div class="slip-instr"><strong>Instruções:</strong> preencha todo o círculo da alternativa escolhida, com caneta azul ou preta. '+
-    'Uma alternativa por questão — mais de uma marcação ou rasura conta como questão em branco. Não escreva sobre os quadrados pretos.</div>'+
+    (mascara
+      ? 'Folha de conferência. Perfure os círculos pretos e sobreponha ao gabarito do aluno, ou use lado a lado para conferir. Não entregue esta folha aos alunos.'
+      : 'Pinte o círculo da alternativa escolhida <strong>até a letra sumir</strong>, com caneta azul ou preta. '+
+        'Uma alternativa por questão — mais de uma marcação ou rasura conta como questão em branco. Não escreva sobre os quadrados pretos.')+
+    '</div>'+
     '<div class="slip-grid" style="grid-template-columns:repeat('+L.colunas+',1fr)">';
   for(var c=0;c<L.colunas;c++){
     h+='<div class="slip-col">';
@@ -840,7 +1019,9 @@ function slipHTML(aluno){
       if(i>=st.nq)break;
       h+='<div class="slip-q"><div class="slip-qn">'+(i+1)+'</div>';
       for(var j=0;j<st.nalt;j++){
-        h+='<div class="bubble" data-q="'+i+'" data-a="'+j+'">'+LETRAS[j]+'</div>';
+        var certa=mascara&&st.gabarito[i]===LETRAS[j]&&st.anuladas.indexOf(i)<0;
+        h+='<div class="bubble'+(certa?" cheia":"")+'" data-q="'+i+'" data-a="'+j+'">'+
+           (certa?"":LETRAS[j])+'</div>';
       }
       h+='</div>';
     }
@@ -857,27 +1038,39 @@ function renderFolha(){
   var L=layoutFolha();
   $("porPagina").textContent=L.porPagina===3?"três":"duas";
   var temAlunos=st.alunos.length>0;
-  if(!temAlunos)st.modoFolha="branco";
-  $("btnModoNominal").classList.toggle("active",st.modoFolha==="nominal");
-  $("btnModoBranco").classList.toggle("active",st.modoFolha==="branco");
+  if(st.modoFolha==="nominal"&&!temAlunos)st.modoFolha="branco";
+  if(st.modoFolha==="mascara"&&!gabaritoCompleto())st.modoFolha="branco";
+  ["Nominal","Branco","Mascara"].forEach(function(k){
+    $("btnModo"+k).classList.toggle("active",st.modoFolha===k.toLowerCase());
+  });
   $("btnModoNominal").disabled=!temAlunos;
-  $("modoHint").textContent=temAlunos
-    ? (st.modoFolha==="nominal"
-        ? "Um gabarito por aluno da lista, com o nome já impresso, na ordem cadastrada."
-        : "Todos os gabaritos saem com a linha do nome em branco.")
-    : "Você ainda não cadastrou alunos. Volte à etapa 1 e cole a lista para imprimir com os nomes.";
-  if(st.modoFolha==="nominal"){
+  $("btnModoMascara").disabled=!gabaritoCompleto();
+  $("modoHint").textContent=
+    st.modoFolha==="mascara"
+      ? "Uma folha com as respostas certas pintadas. Perfure os círculos pretos e sobreponha ao gabarito do aluno — os acertos aparecem pelos furos. Não entregue aos alunos."
+      : temAlunos
+        ? (st.modoFolha==="nominal"
+            ? "Um gabarito por aluno da lista, com o nome já impresso, na ordem cadastrada."
+            : "Todos os gabaritos saem com a linha do nome em branco.")
+        : "Você ainda não cadastrou alunos. Volte à etapa 1 e cole a lista para imprimir com os nomes.";
+  var ehMascara=st.modoFolha==="mascara";
+  $("fCopias").disabled=ehMascara;
+  if(ehMascara){
+    $("lblCopias").textContent="Cópias da folha-máscara";
+    $("fCopias").value=1;
+  }else if(st.modoFolha==="nominal"){
     $("lblCopias").textContent="Gabaritos extras em branco";
     $("fCopias").value=st.extras;
   }else{
     $("lblCopias").textContent="Quantos gabaritos imprimir";
     $("fCopias").value=st.avulsos;
   }
-  $("folhaPreview").innerHTML=slipHTML(st.modoFolha==="nominal"?st.alunos[0]:null);
+  $("folhaPreview").innerHTML=slipHTML(st.modoFolha==="nominal"?st.alunos[0]:null,ehMascara);
   atualizarCopias();
 }
 function listaSlips(){
   var itens=[];
+  if(st.modoFolha==="mascara")return [null];
   if(st.modoFolha==="nominal"){
     st.alunos.forEach(function(a){itens.push(a);});
     for(var i=0;i<st.extras;i++)itens.push(null);
@@ -888,21 +1081,26 @@ function listaSlips(){
 }
 function atualizarCopias(){
   var L=layoutFolha();
+  var ehMascara=st.modoFolha==="mascara";
   var v=parseInt($("fCopias").value,10);
   if(!(v>=0))v=0;
-  if(st.modoFolha==="nominal")st.extras=v;else st.avulsos=Math.max(1,v);
+  if(!ehMascara){
+    if(st.modoFolha==="nominal")st.extras=v;else st.avulsos=Math.max(1,v);
+  }
   save();
   var itens=listaSlips();
   var n=itens.length;
   var paginas=Math.ceil(n/L.porPagina)||0;
-  $("copiasHint").textContent=(st.modoFolha==="nominal"
-      ? st.alunos.length+" alunos + "+st.extras+" em branco = "+n+" gabaritos"
-      : n+" gabaritos")
-    +" · "+paginas+(paginas===1?" página":" páginas")+" · "+L.porPagina+" por página";
+  $("copiasHint").textContent=ehMascara
+    ? "Uma folha, para perfurar ou conferir lado a lado"
+    : (st.modoFolha==="nominal"
+        ? st.alunos.length+" alunos + "+st.extras+" em branco = "+n+" gabaritos"
+        : n+" gabaritos")
+      +" · "+paginas+(paginas===1?" página":" páginas")+" · "+L.porPagina+" por página";
   var h="",k=0;
   while(k<n){
     h+='<div class="print-page">';
-    for(var c=0;c<L.porPagina&&k<n;c++){h+=slipHTML(itens[k]);k++;}
+    for(var c=0;c<L.porPagina&&k<n;c++){h+=slipHTML(itens[k],ehMascara);k++;}
     h+='</div>';
   }
   $("printArea").innerHTML=h;
@@ -1729,7 +1927,7 @@ $("fFoto").addEventListener("change",function(){
 LOGO_PADRAO=document.querySelector(".header-logo").src;
 load();
 if(!st.escola)st.escola={nome:"",contato:"",logo:"",logoRede:""};
-ajustarTamanhos();preencherForm();
+ajustarTamanhos();preencherForm();renderSeletorProvas();
 
 /* volta para onde o professor estava, mesmo que o navegador tenha recarregado */
 var telaSalva=st.tela||"prova";
