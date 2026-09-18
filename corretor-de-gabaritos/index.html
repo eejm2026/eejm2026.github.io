@@ -179,7 +179,9 @@ td.num{text-align:right;font-variant-numeric:tabular-nums;}
   border:1px dashed #9aa3b5;font-family:"Segoe UI",system-ui,sans-serif;
   width:186mm;min-height:88mm;
 }
-.slip-mark{position:absolute;width:4mm;height:4mm;background:#000;}
+/* Marcadores e codigo sao desenhados em SVG, nao com cor de fundo:
+   navegador de celular descarta background ao imprimir. */
+.slip-mark{position:absolute;width:4mm;height:4mm;display:block;}
 .slip-mark.tl{top:2mm;left:2mm;} .slip-mark.tr{top:2mm;right:2mm;}
 .slip-mark.bl{bottom:2mm;left:2mm;}
 .slip-mark.br{bottom:2mm;right:2mm;width:9mm;} /* largo de proposito: define a orientacao da folha */
@@ -198,8 +200,7 @@ td.num{text-align:right;font-variant-numeric:tabular-nums;}
 .slip-val{font-weight:700;font-size:8.5pt;}
 .slip-code{display:flex;align-items:center;gap:1mm;margin-left:auto;padding-left:3mm;}
 .slip-code-lbl{font-size:5pt;color:#888;letter-spacing:.04em;}
-.code-cell{width:3.2mm;height:3.2mm;border:.7pt solid #000;flex-shrink:0;}
-.code-cell.on{background:#000;}
+.code-cell{width:3.2mm;height:3.2mm;flex-shrink:0;display:block;}
 .slip-code-num{font-size:8.5pt;font-weight:700;margin-left:.5mm;}
 .modo-btn.active{background:var(--blue);color:var(--white);border-color:var(--blue);}
 .f-nome{flex:1;min-width:60mm;} .f-num{width:16mm;} .f-turma{width:22mm;} .f-data{width:22mm;}
@@ -217,6 +218,9 @@ td.num{text-align:right;font-variant-numeric:tabular-nums;}
 @media print{
   @page{size:A4 portrait;margin:7mm;}
   body{background:#fff;}
+  /* pede ao navegador que imprima fundos e cores; celular costuma ignorar,
+     por isso nada essencial depende disso — marcadores e código são SVG */
+  *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;}
   .app-header,.nav,.status-bar,.no-print,.footer{display:none!important;}
   .wrap{max-width:none;padding:0;margin:0;}
   .screen{display:none!important;}
@@ -760,9 +764,18 @@ function bitsCodigo(cod){
   bits.push(uns%2);
   return bits;
 }
+function svgQuadrado(cls,preenchido){
+  return '<svg class="'+cls+'" viewBox="0 0 10 10" preserveAspectRatio="none" aria-hidden="true">'+
+    '<rect x="0.6" y="0.6" width="8.8" height="8.8" fill="'+(preenchido?"#000":"#fff")+
+    '" stroke="#000" stroke-width="1.2"></rect></svg>';
+}
+function svgMarcador(cls){
+  return '<svg class="'+cls+'" viewBox="0 0 10 10" preserveAspectRatio="none" aria-hidden="true">'+
+    '<rect x="0" y="0" width="10" height="10" fill="#000"></rect></svg>';
+}
 function codigoHTML(cod){
   var bits=bitsCodigo(cod),h='<div class="slip-code"><span class="slip-code-lbl">cód.</span>';
-  bits.forEach(function(b){h+='<div class="code-cell'+(b?" on":"")+'"></div>';});
+  bits.forEach(function(b){h+=svgQuadrado("code-cell",b);});
   h+='<span class="slip-code-num">'+(cod?String(cod).padStart(2,"0"):"--")+'</span></div>';
   return h;
 }
@@ -776,8 +789,8 @@ function slipHTML(aluno){
   var E=escolaAtual();
   var p=aluno?partesAluno(aluno.nome):{num:"",nome:""};
   var h='<div class="slip">'+
-    '<div class="slip-mark tl"></div><div class="slip-mark tr"></div>'+
-    '<div class="slip-mark bl"></div><div class="slip-mark br"></div>'+
+    svgMarcador("slip-mark tl")+svgMarcador("slip-mark tr")+
+    svgMarcador("slip-mark bl")+svgMarcador("slip-mark br")+
     '<div class="slip-head">'+
       (E.logo?'<img class="slip-logo" src="'+E.logo+'" alt="Brasão da escola">':'')+
       '<div class="slip-ident">'+
