@@ -470,9 +470,9 @@ details.dbg summary{cursor:pointer;font-size:12.5px;font-weight:600;color:var(--
         </div>
       </div>
       <div class="leitura">
-        <label class="btn btn-primary" for="fFoto" style="width:100%">📷 Ler gabarito com a câmera</label>
-        <input type="file" id="fFoto" accept="image/*" capture="environment" hidden>
-        <div class="field-hint" style="margin-top:8px">Fotografe o gabarito de cima, com os quatro cantos pretos dentro do quadro. O app preenche a grade e você confere.</div>
+        <label class="btn btn-primary" id="lblFoto" for="fFoto" style="width:100%">📷 Ler gabarito por foto</label>
+        <input type="file" id="fFoto" accept="image/*" hidden>
+        <div class="field-hint" style="margin-top:8px">Fotografe o gabarito de cima, com os quatro cantos pretos dentro do quadro. O app preenche a grade e você confere.<br><strong>No celular, prefira escolher a foto pela galeria:</strong> abrir a câmera por dentro do navegador costuma fazer o Android descarregar a página.</div>
         <div id="leituraPainel" hidden></div>
       </div>
       <div id="corrList"></div>
@@ -508,7 +508,7 @@ var st={
   atividade:"",disciplina:"",professor:"",bimestre:"",turma:"",data:"",
   nq:10,nalt:5,notaMax:10,
   gabarito:[],anuladas:[],alunos:[],atual:0,
-  modoFolha:"nominal",extras:3,avulsos:30,
+  modoFolha:"nominal",extras:3,avulsos:30,tela:"prova",aguardandoFoto:false,
   escola:{nome:"",contato:"",logo:"",logoRede:""}
 };
 var LOGO_PADRAO="";
@@ -590,6 +590,7 @@ function notaDe(a){return st.nq?acertosDe(a)/st.nq*st.notaMax:0;}
 function irPara(nome){
   document.querySelectorAll(".screen").forEach(function(s){s.classList.remove("active");});
   $("screen-"+nome).classList.add("active");
+  st.tela=nome;save();
   document.querySelectorAll(".nav-btn").forEach(function(b){b.classList.toggle("active",b.dataset.screen===nome);});
   window.scrollTo(0,0);
   if(nome==="gabarito")renderGabarito();
@@ -1699,7 +1700,13 @@ function aplicarLeitura(res){
   window.scrollTo(0,0);
 }
 
+/* Android descarta a página quando a câmera abre por cima dela. Marcamos a saída
+   para, ao voltar, explicar o que houve em vez de o professor achar que travou. */
+$("lblFoto").addEventListener("click",function(){
+  st.aguardandoFoto=true;save();
+});
 $("fFoto").addEventListener("change",function(){
+  st.aguardandoFoto=false;save();
   var f=this.files&&this.files[0];
   if(!f)return;
   var p=$("leituraPainel");
@@ -1723,11 +1730,30 @@ LOGO_PADRAO=document.querySelector(".header-logo").src;
 load();
 if(!st.escola)st.escola={nome:"",contato:"",logo:"",logoRede:""};
 ajustarTamanhos();preencherForm();
+
+/* volta para onde o professor estava, mesmo que o navegador tenha recarregado */
+var telaSalva=st.tela||"prova";
+var voltandoDaCamera=!!st.aguardandoFoto;
+st.aguardandoFoto=false;save();
 if(!st.data){
   var hoje=new Date();
   $("fData").value=hoje.getFullYear()+"-"+String(hoje.getMonth()+1).padStart(2,"0")+"-"+String(hoje.getDate()).padStart(2,"0");
 }
 renderGabarito();
+if(telaSalva!=="prova"&&$("screen-"+telaSalva))irPara(telaSalva);
+
+if(voltandoDaCamera){
+  var pf=$("leituraPainel");
+  if(pf){
+    pf.hidden=false;
+    pf.innerHTML='<div class="box box-amber" style="margin-top:12px"><b>A página recarregou</b>'+
+      'O Android descarregou o aplicativo enquanto a câmera estava aberta, e a foto se perdeu no caminho. '+
+      'Nada do seu trabalho foi perdido — a turma e as respostas continuam salvas.<br><br>'+
+      'Para evitar que aconteça de novo: <strong>tire as fotos primeiro pelo aplicativo da câmera</strong>, '+
+      'feche-o, e aqui escolha <strong>Galeria</strong> ou <strong>Arquivos</strong> em vez de Câmera. '+
+      'Assim a página não sai da memória.</div>';
+  }
+}
 })();
 </script>
 
