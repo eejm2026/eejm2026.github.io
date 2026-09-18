@@ -497,7 +497,14 @@ details.dbg summary{cursor:pointer;font-size:12.5px;font-weight:600;color:var(--
         </div>
       </div>
       <div class="leitura">
-        <label class="btn btn-primary" id="lblFoto" for="fFoto" style="width:100%">📷 Ler gabarito por foto</label>
+        <label class="btn btn-primary" id="lblLote" for="fLote" style="width:100%">📥 Ler turma inteira (digitalização)</label>
+        <input type="file" id="fLote" accept="application/pdf,.pdf,image/*" multiple hidden>
+        <div class="field-hint" style="margin:8px 0 14px">Digitalize os gabaritos na multifuncional, uma folha por página, e envie o PDF inteiro de uma vez. Também aceita várias imagens selecionadas juntas.</div>
+        <div id="lotePainel" hidden></div>
+      </div>
+
+      <div class="leitura">
+        <label class="btn btn-secondary" id="lblFoto" for="fFoto" style="width:100%">📷 Ler um gabarito por foto</label>
         <input type="file" id="fFoto" accept="image/*" hidden>
         <div class="field-hint" style="margin-top:8px">Fotografe o gabarito de cima, com os quatro cantos pretos dentro do quadro. O app preenche a grade e você confere.<br><strong>No celular, prefira escolher a foto pela galeria:</strong> abrir a câmera por dentro do navegador costuma fazer o Android descarregar a página.</div>
         <div id="leituraPainel" hidden></div>
@@ -1781,19 +1788,35 @@ function lerFoto(cv){
     porQ[b.q][b.a]={esc:esc,x:p.x,y:p.y,r:r};
   });
 
+  /* Limiar calibrado pela própria folha: a maioria das bolhas está vazia, então a
+     mediana descreve o papel impresso e o topo descreve o que foi pintado.
+     Isso absorve diferenças entre digitalização e foto, caneta e lápis. */
+  var todas=[];
+  for(var q0=0;q0<st.nq;q0++){
+    var l0=porQ[q0]||[];
+    for(var a0=0;a0<st.nalt;a0++)todas.push((l0[a0]||{esc:0}).esc);
+  }
+  todas.sort(function(x,y){return x-y;});
+  var mediana=todas[Math.floor(todas.length*0.5)]||0;
+  var pico=todas[Math.floor(todas.length*0.92)]||0;
+  var limiar=Math.max(mediana+0.05,mediana+0.40*(pico-mediana));
+
   var respostas=[],duvidas=[],detalhe=[];
   for(var q=0;q<st.nq;q++){
     var linha=porQ[q]||[];
-    var melhor=-1,vMelhor=0,vSeg=0;
+    var melhor=-1,vMelhor=0,vSeg=0,acima=0;
     for(var a2=0;a2<st.nalt;a2++){
       var e=(linha[a2]||{esc:0}).esc;
+      if(e>limiar)acima++;
       if(e>vMelhor){vSeg=vMelhor;vMelhor=e;melhor=a2;}
       else if(e>vSeg)vSeg=e;
     }
     var estado;
-    if(vMelhor<0.085){respostas.push(null);estado="branco";duvidas.push(q);}
-    else if(vSeg>vMelhor*0.55){respostas.push(null);estado="duplo";duvidas.push(q);}
-    else if(vMelhor<0.13||vSeg>vMelhor*0.42){respostas.push(LETRAS[melhor]);estado="fraco";duvidas.push(q);}
+    if(acima===0){respostas.push(null);estado="branco";duvidas.push(q);}
+    else if(acima>1){respostas.push(null);estado="duplo";duvidas.push(q);}
+    else if(vSeg>vMelhor*0.55||vMelhor<limiar*1.2){
+      respostas.push(LETRAS[melhor]);estado="fraco";duvidas.push(q);
+    }
     else {respostas.push(LETRAS[melhor]);estado="ok";}
     detalhe.push({q:q,estado:estado,linha:linha,melhor:melhor});
   }
@@ -1921,6 +1944,189 @@ $("fFoto").addEventListener("change",function(){
       mostrarLeitura(res);
     });
   },50);
+});
+
+/* ================= LEITURA EM LOTE =================
+   PDF digitalizado com uma folha por página, ou várias imagens de uma vez.
+   O PDF exige a biblioteca pdf.js, carregada só quando o professor usa o recurso. */
+
+var PDFJS_URL="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";
+var PDFJS_WORKER="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+var pdfjsCarregando=false;
+
+function carregarPdfJs(cb){
+  if(window.pdfjsLib){cb(true);return;}
+  if(pdfjsCarregando){setTimeout(function(){carregarPdfJs(cb);},300);return;}
+  pdfjsCarregando=true;
+  var s=document.createElement("script");
+  s.src=PDFJS_URL;
+  s.onload=function(){
+    try{window.pdfjsLib.GlobalWorkerOptions.workerSrc=PDFJS_WORKER;}catch(e){}
+    cb(!!window.pdfjsLib);
+  };
+  s.onerror=function(){pdfjsCarregando=false;cb(false);};
+  document.head.appendChild(s);
+}
+
+function paginasDoPdf(file,cb){
+  carregarPdfJs(function(ok){
+    if(!ok){cb(null,"Não consegui carregar o leitor de PDF. Verifique a internet, ou peça à multifuncional para gerar imagens JPEG em vez de PDF.");return;}
+    var fr=new FileReader();
+    fr.onload=function(){
+      window.pdfjsLib.getDocument({data:new Uint8Array(fr.result)}).promise.then(function(doc){
+        var lista=[];
+        for(var i=1;i<=doc.numPages;i++){
+          (function(n){
+            lista.push({rotulo:"Página "+n,render:function(){
+              return doc.getPage(n).then(function(pg){
+                var vp=pg.getViewport({scale:1});
+                var esc=Math.min(2.2,1500/Math.max(vp.width,vp.height));
+                var v2=pg.getViewport({scale:esc});
+                var cv=document.createElement("canvas");
+                cv.width=Math.round(v2.width);cv.height=Math.round(v2.height);
+                return pg.render({canvasContext:cv.getContext("2d"),viewport:v2}).promise
+                  .then(function(){return cv;});
+              });
+            }});
+          })(i);
+        }
+        cb(lista,null);
+      }).catch(function(){cb(null,"Não consegui abrir este PDF.");});
+    };
+    fr.onerror=function(){cb(null,"Não consegui ler o arquivo.");};
+    fr.readAsArrayBuffer(file);
+  });
+}
+
+function paginasDeImagens(files){
+  return files.map(function(f,i){
+    return {rotulo:f.name||("Imagem "+(i+1)),render:function(){
+      return new Promise(function(res,rej){
+        carregarImagem(f,function(cv){cv?res(cv):rej();});
+      });
+    }};
+  });
+}
+
+function processarLote(paginas){
+  var painel=$("lotePainel");
+  painel.hidden=false;
+  var achados=[],i=0;
+  function passo(){
+    if(i>=paginas.length){mostrarLote(achados);return;}
+    var pg=paginas[i];
+    painel.innerHTML='<div class="box box-blue" style="margin-top:12px"><b>Lendo</b>'+
+      escapar(pg.rotulo)+" — "+(i+1)+" de "+paginas.length+
+      '<div class="dim-bar-bg" style="margin-top:8px"><div class="dim-bar-fill bar-cp" style="width:'+
+      Math.round(i/paginas.length*100)+'%"></div></div></div>';
+    pg.render().then(function(cv){
+      var res;
+      try{res=lerFoto(cv);}catch(e){res={erro:"Falha ao processar: "+e.message};}
+      res.rotulo=pg.rotulo;
+      achados.push(res);
+      i++;setTimeout(passo,20);
+    }).catch(function(){
+      achados.push({rotulo:pg.rotulo,erro:"Não consegui abrir esta página."});
+      i++;setTimeout(passo,20);
+    });
+  }
+  passo();
+}
+
+function donoDaLeitura(res){
+  if(!res.codigoOk||!res.codigo)return null;
+  for(var i=0;i<st.alunos.length;i++)if(st.alunos[i].cod===res.codigo)return i;
+  return null;
+}
+
+function mostrarLote(achados){
+  var painel=$("lotePainel");
+  var aplicaveis=[];
+  var h='<div class="leitura-res"><h3 class="section-title" style="margin-top:14px">Resultado da leitura</h3>'+
+        '<div class="table-scroll"><table><thead><tr><th>Página</th><th>Aluno</th>'+
+        '<th class="num">Seguras</th><th>Situação</th></tr></thead><tbody>';
+  achados.forEach(function(r,ix){
+    if(r.erro){
+      h+='<tr><td>'+escapar(r.rotulo)+'</td><td>—</td><td class="num">—</td>'+
+         '<td><span class="pill pill-red">não lida</span> '+escapar(r.erro)+'</td></tr>';
+      return;
+    }
+    var idx=donoDaLeitura(r);
+    r.alvo=idx;
+    var seguras=st.nq-r.duvidas.length;
+    var quem,sit;
+    if(idx!=null){
+      quem="#"+String(r.codigo).padStart(2,"0")+" "+escapar(st.alunos[idx].nome);
+      aplicaveis.push(ix);
+      sit=r.duvidas.length
+        ? '<span class="pill pill-amber">conferir '+r.duvidas.map(function(q){return q+1;}).join(", ")+'</span>'
+        : '<span class="pill pill-green">completa</span>';
+    }else if(r.codigoOk&&r.codigo===0){
+      quem="gabarito avulso";
+      sit='<span class="pill pill-amber">sem dono — lance à mão</span>';
+    }else if(r.codigoOk){
+      quem="código "+r.codigo;
+      sit='<span class="pill pill-red">código não está nesta prova</span>';
+    }else{
+      quem="—";
+      sit='<span class="pill pill-red">código ilegível</span>';
+    }
+    h+='<tr><td>'+escapar(r.rotulo)+'</td><td>'+quem+'</td>'+
+       '<td class="num">'+seguras+"/"+st.nq+'</td><td>'+sit+'</td></tr>';
+  });
+  h+='</tbody></table></div>';
+  h+='<div class="box '+(aplicaveis.length?"box-green":"box-amber")+'" style="margin-top:12px"><b>Resumo</b>'+
+     aplicaveis.length+" de "+achados.length+" páginas foram associadas a alunos desta prova."+
+     (aplicaveis.length<achados.length?" As demais precisam ser lançadas à mão — abra a lista acima para ver o motivo de cada uma.":"")+
+     '</div>';
+  h+='<div class="btn-row" style="margin-top:12px">'+
+     (aplicaveis.length?'<button class="btn btn-primary" id="btnAplicarLote" type="button">Aplicar '+aplicaveis.length+' leituras</button>':"")+
+     '<button class="btn btn-outline" id="btnFecharLote" type="button">Fechar</button></div>';
+  h+="</div>";
+  painel.innerHTML=h;
+  if(aplicaveis.length){
+    $("btnAplicarLote").addEventListener("click",function(){
+      aplicaveis.forEach(function(ix){
+        var r=achados[ix],al=st.alunos[r.alvo];
+        al.respostas=r.respostas.slice();
+        al.duvidas=r.duvidas.slice();
+      });
+      var comDuvida=aplicaveis.filter(function(ix){return achados[ix].duvidas.length;}).length;
+      save();
+      painel.hidden=true;painel.innerHTML="";
+      renderCorrigir();
+      alert(aplicaveis.length+" gabaritos lançados."+
+        (comDuvida?" "+comDuvida+" têm questões destacadas em âmbar para você conferir, aluno por aluno.":""));
+      window.scrollTo(0,0);
+    });
+  }
+  $("btnFecharLote").addEventListener("click",function(){painel.hidden=true;painel.innerHTML="";});
+}
+
+$("fLote").addEventListener("change",function(){
+  var arquivos=Array.prototype.slice.call(this.files||[]);
+  var inp=this;
+  if(!arquivos.length)return;
+  if(!st.alunos.length){
+    alert("Cadastre a turma antes: a leitura em lote associa cada página ao aluno pelo código impresso no gabarito.");
+    inp.value="";return;
+  }
+  var painel=$("lotePainel");
+  painel.hidden=false;
+  painel.innerHTML='<div class="box box-blue" style="margin-top:12px"><b>Preparando</b>Abrindo os arquivos.</div>';
+  var pdf=arquivos.filter(function(f){return /pdf$/i.test(f.name)||f.type==="application/pdf";});
+  inp.value="";
+  if(pdf.length){
+    paginasDoPdf(pdf[0],function(lista,erro){
+      if(!lista){
+        painel.innerHTML='<div class="box box-red" style="margin-top:12px"><b>Não deu para abrir</b>'+escapar(erro)+'</div>';
+        return;
+      }
+      processarLote(lista);
+    });
+  }else{
+    processarLote(paginasDeImagens(arquivos));
+  }
 });
 
 /* ---------- init ---------- */
