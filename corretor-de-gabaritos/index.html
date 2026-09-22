@@ -576,7 +576,15 @@ var st={
 var LOGO_PADRAO="";
 var ESCOLA_PADRAO={nome:"ESCOLA ESTADUAL JOAQUIM MURTINHO",contato:"Campo Grande — MS",logo:"",logoRede:""};
 
-function tituloProva(){
+/* Separador estreito de proposito: o travessao " — " come quase 4mm por ocorrencia
+   na linha do titulo da folha, que tem largura fixa e corta com reticencias. */
+function nomeProfessor(){
+  if(!st.professor)return "";
+  var pr=st.professor.trim();
+  if(!/^prof/i.test(pr))pr="Prof. "+pr;
+  return pr;
+}
+function tituloProva(semProf){
   var p=[];
   if(st.atividade)p.push(st.atividade);
   if(st.disciplina)p.push((st.atividade?"de ":"")+st.disciplina);
@@ -584,13 +592,30 @@ function tituloProva(){
   var extra=[];
   if(st.turma)extra.push(st.turma);
   if(st.bimestre)extra.push(st.bimestre);
-  if(extra.length)t=(t?t+" — ":"")+extra.join(" — ");
-  if(st.professor){
-    var pr=st.professor.trim();
-    if(!/^prof/i.test(pr))pr="Prof. "+pr;
-    t=(t?t+" · ":"")+pr;
-  }
+  if(extra.length)t=(t?t+" · ":"")+extra.join(" · ");
+  if(!semProf&&nomeProfessor())t=(t?t+" · ":"")+nomeProfessor();
   return t;
+}
+/* A linha do titulo da folha tem largura fixa (a grade de bolhas nao pode se mover),
+   entao mede-se o texto por canvas — funciona mesmo com #printArea em display:none,
+   onde nao existe layout para consultar — e o rotulo "Folha de Respostas" e' o
+   primeiro a sair quando falta espaco: e' a parte que a folha ja diz por si. */
+var LARGURA_TITULO=428;
+var _ctxMedida=null;
+function larguraTexto(txt){
+  if(!_ctxMedida){
+    try{_ctxMedida=document.createElement("canvas").getContext("2d");}
+    catch(e){_ctxMedida=false;}
+  }
+  if(!_ctxMedida)return txt.length*5.2;
+  _ctxMedida.font='600 10px "Segoe UI",system-ui,-apple-system,sans-serif';
+  return _ctxMedida.measureText(txt).width;
+}
+function tituloFolha(){
+  var t=tituloProva(true);
+  if(!t)return "Folha de Respostas";
+  var comRotulo="Folha de Respostas · "+t;
+  return larguraTexto(comRotulo)<=LARGURA_TITULO?comRotulo:t;
 }
 function escolaAtual(){
   var e=st.escola||{};
@@ -831,8 +856,8 @@ function lerCampos(){
 function atualizarCabecalho(){
   var E=escolaAtual();
   $("headerEscola").textContent=E.nome;
-  var t=tituloProva();
-  $("previewTitulo").textContent="Folha de Respostas"+(t?" — "+t:"")+
+  var t=tituloProva(true);
+  $("previewTitulo").textContent=tituloFolha()+
     (t?"":"  (preencha os campos acima para compor esta linha)");
 }
 ["fAtividade","fDisciplina","fProfessor","fBimestre","fTurma"].forEach(function(id){
@@ -1027,7 +1052,7 @@ function slipHTML(aluno,mascara){
       (E.logoRede?'<img class="slip-logo" src="'+E.logoRede+'" alt="Logo da rede de ensino">':'')+
     '</div>'+
     '<div class="slip-subhead">'+
-      '<div class="slip-title">Folha de Respostas'+(tituloProva()?" — "+escapar(tituloProva()):"")+'</div>'+
+      '<div class="slip-title">'+escapar(tituloFolha())+'</div>'+
       codigoHTML(aluno&&aluno.cod?aluno.cod:0)+
     '</div>'+
     '<div class="slip-body">'+
@@ -1060,7 +1085,7 @@ function slipHTML(aluno,mascara){
     h+='</div>';
   }
   h+='</div></div>'+
-    '<div class="slip-foot"><span>'+escapar(E.nome)+'</span>'+
+    '<div class="slip-foot"><span>'+escapar(nomeProfessor()||E.nome)+'</span>'+
     '<span>'+st.nq+' questões · '+st.nalt+' alternativas</span></div>'+
     '</div>';
   return h;
@@ -2345,6 +2370,5 @@ if(voltandoDaCamera){
 }
 })();
 </script>
-
 </body>
 </html>
