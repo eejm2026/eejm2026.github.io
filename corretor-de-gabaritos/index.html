@@ -186,10 +186,13 @@ details.dbg summary{cursor:pointer;font-size:12.5px;font-weight:600;color:var(--
 /* ===== FOLHA DE RESPOSTAS (impressao) ===== */
 #folhaPreview{background:var(--white);border-radius:var(--radius);box-shadow:var(--shadow);padding:14px;overflow-x:auto;}
 #printArea{display:none;}
+/* GEOMETRIA FIXA — nada aqui pode depender do comprimento do nome nem do texto
+   das instruções: a grade de bolhas é ancorada aos marcadores, em posição
+   absoluta, para que toda folha impressa tenha as bolhas no mesmo lugar. */
 .slip{
   position:relative;background:#fff;color:#000;padding:5mm 6mm;
   border:1px dashed #9aa3b5;font-family:"Segoe UI",system-ui,sans-serif;
-  width:186mm;min-height:88mm;
+  width:186mm;height:92mm;overflow:hidden;
 }
 /* Marcadores e codigo sao desenhados em SVG, nao com cor de fundo:
    navegador de celular descarta background ao imprimir. */
@@ -197,27 +200,45 @@ details.dbg summary{cursor:pointer;font-size:12.5px;font-weight:600;color:var(--
 .slip-mark.tl{top:2mm;left:2mm;} .slip-mark.tr{top:2mm;right:2mm;}
 .slip-mark.bl{bottom:2mm;left:2mm;}
 .slip-mark.br{bottom:2mm;right:2mm;width:9mm;} /* largo de proposito: define a orientacao da folha */
-.slip-head{display:flex;align-items:center;gap:3mm;border-bottom:1.2pt solid #000;padding:0 4mm 1.5mm;}
-.slip-logo{width:10mm;height:auto;flex-shrink:0;}
-.slip-ident{flex:1;min-width:0;text-align:center;}
-.slip-school{font-size:9.5pt;font-weight:700;line-height:1.2;}
-.slip-contato{font-size:6pt;color:#333;line-height:1.3;margin-top:.5mm;}
-.slip-subhead{display:flex;align-items:center;gap:3mm;padding:1.2mm 4mm 0;margin-bottom:2mm;}
-.slip-title{font-size:7.5pt;line-height:1.3;flex:1;min-width:0;font-weight:600;}
+.slip-head{
+  position:absolute;top:4mm;left:10mm;right:10mm;height:12mm;
+  display:flex;align-items:center;gap:3mm;border-bottom:1.2pt solid #000;overflow:hidden;
+}
+.slip-logo{width:10mm;height:auto;max-height:11mm;flex-shrink:0;}
+.slip-ident{flex:1;min-width:0;text-align:center;overflow:hidden;}
+.slip-school{font-size:9.5pt;font-weight:700;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.slip-contato{font-size:6pt;color:#333;line-height:1.3;margin-top:.5mm;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.slip-subhead{
+  position:absolute;top:17mm;left:10mm;right:10mm;height:5mm;
+  display:flex;align-items:center;gap:3mm;overflow:hidden;
+}
+.slip-title{font-size:7.5pt;line-height:1.3;flex:1;min-width:0;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .logo-prev{margin-top:8px;min-height:4px;}
 .logo-prev img{max-height:54px;width:auto;border:1px solid var(--gray-mid);border-radius:6px;padding:4px;background:var(--white);}
-.slip-body{padding:0 4mm;}
-.slip-fields{display:flex;gap:2mm;font-size:8pt;margin-bottom:2mm;}
-.slip-field{border-bottom:1pt solid #000;min-height:5.5mm;display:flex;align-items:flex-end;gap:1.5mm;padding:0 1mm .5mm;}
-.slip-val{font-weight:700;font-size:8.5pt;}
+.slip-body{position:static;}
+.slip-fields{
+  position:absolute;top:23mm;left:10mm;right:10mm;height:7mm;
+  display:flex;gap:2mm;font-size:8pt;overflow:hidden;
+}
+.slip-field{
+  border-bottom:1pt solid #000;height:6.5mm;display:flex;align-items:flex-end;gap:1.5mm;
+  padding:0 1mm .5mm;overflow:hidden;white-space:nowrap;
+}
+.slip-val{font-weight:700;font-size:8.5pt;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;}
 .slip-code{display:flex;align-items:center;gap:1mm;margin-left:auto;padding-left:3mm;}
 .slip-code-lbl{font-size:5pt;color:#888;letter-spacing:.04em;}
 .code-cell{width:3.2mm;height:3.2mm;flex-shrink:0;display:block;}
 .slip-code-num{font-size:8.5pt;font-weight:700;margin-left:.5mm;}
 .modo-btn.active{background:var(--blue);color:var(--white);border-color:var(--blue);}
 .f-nome{flex:1;min-width:60mm;} .f-num{width:16mm;} .f-turma{width:22mm;} .f-data{width:22mm;}
-.slip-instr{border:.8pt solid #000;padding:1mm 2mm;font-size:6.5pt;line-height:1.4;margin-bottom:2.5mm;}
-.slip-grid{display:grid;gap:2mm 4mm;}
+.slip-instr{
+  position:absolute;top:31mm;left:10mm;right:10mm;height:7mm;
+  border:.8pt solid #000;padding:1mm 2mm;font-size:6.5pt;line-height:1.35;overflow:hidden;
+}
+.slip-grid{
+  position:absolute;top:41mm;left:10mm;right:10mm;
+  display:grid;gap:2mm 4mm;
+}
 .slip-col{display:flex;flex-direction:column;gap:2mm;}
 .slip-q{display:flex;align-items:center;gap:1.6mm;}
 .slip-qn{width:6mm;text-align:right;font-size:9pt;font-weight:700;font-variant-numeric:tabular-nums;}
@@ -226,7 +247,11 @@ details.dbg summary{cursor:pointer;font-size:12.5px;font-weight:600;color:var(--
   font-size:6.5pt;display:flex;align-items:center;justify-content:center;color:#777;flex-shrink:0;
 }
 .bubble.cheia{background:#000;box-shadow:inset 0 0 0 6mm #000;}
-.slip-foot{margin-top:2.5mm;padding:1.5mm 4mm 0;border-top:.8pt solid #000;font-size:6.5pt;display:flex;justify-content:space-between;gap:3mm;}
+.slip-foot{
+  position:absolute;bottom:4mm;left:10mm;right:14mm;height:4mm;
+  padding-top:1.5mm;border-top:.8pt solid #000;font-size:6.5pt;
+  display:flex;justify-content:space-between;gap:3mm;overflow:hidden;white-space:nowrap;
+}
 
 @media print{
   @page{size:A4 portrait;margin:7mm;}
@@ -1012,7 +1037,7 @@ function slipHTML(aluno,mascara){
       '<div class="slip-field f-turma">Turma:</div>'+
       '<div class="slip-field f-data">Data:</div>'+
     '</div>'+
-    '<div class="slip-instr"><strong>Instruções:</strong> preencha todo o círculo da alternativa escolhida, com caneta azul ou preta. '+
+    '<div class="slip-instr"><strong>Instruções:</strong> '+
     (mascara
       ? 'Folha de conferência. Perfure os círculos pretos e sobreponha ao gabarito do aluno, ou use lado a lado para conferir. Não entregue esta folha aos alunos.'
       : 'Pinte o círculo da alternativa escolhida <strong>até a letra sumir</strong>, com caneta azul ou preta. '+
@@ -1859,17 +1884,20 @@ function lerFoto(cv){
   }
 
   // código do aluno
-  var bitsLidos=[],detCod=[];
+  var bitsLidos=[],detCod=[],duvidoso=false;
   ref.codigo.forEach(function(c){
     var p=aplicarH(H,c.x,c.y),r=escalaEm(c,c.r);
     var dentro=mediaDisco(im,p.x,p.y,r*0.5);
     var fora=mediaAnel(im,p.x,p.y,r*1.5,r*2.2);
     var esc=Math.max(0,(fora-dentro))/255;
+    /* quadrado impresso é preto sólido e o vazio é papel: valor no meio
+       significa que a amostragem caiu fora do quadrado */
+    if(esc>0.15&&esc<0.42)duvidoso=true;
     bitsLidos.push(esc>0.28?1:0);
     detCod.push({x:p.x,y:p.y,r:r,esc:esc});
   });
   var codigo=null,codigoOk=false;
-  if(bitsLidos.length===8){
+  if(bitsLidos.length===8&&!duvidoso){
     var uns=0;
     for(var i=0;i<7;i++)if(bitsLidos[i])uns++;
     if(uns%2===bitsLidos[7]){
