@@ -1167,6 +1167,7 @@ function renderCorrigir(){
           b.setAttribute("aria-label","Questão "+(i+1)+", marcar "+L);
           b.addEventListener("click",function(){
             al.respostas[i]=(al.respostas[i]===L?null:L);
+            al.lancado=true;al.ausente=false;
             resolverDuvida();save();renderCorrigir();
           });
           opts.appendChild(b);
@@ -1175,15 +1176,42 @@ function renderCorrigir(){
       var bz=el("button","opt blank"+(al.respostas[i]==null?" sel":""),"—");
       bz.type="button";bz.title="Em branco";
       bz.setAttribute("aria-label","Questão "+(i+1)+", deixar em branco");
-      bz.addEventListener("click",function(){al.respostas[i]=null;resolverDuvida();save();renderCorrigir();});
+      bz.addEventListener("click",function(){
+        al.respostas[i]=null;al.lancado=true;al.ausente=false;
+        resolverDuvida();save();renderCorrigir();
+      });
       opts.appendChild(bz);
       row.appendChild(opts);
       if(anulada)row.appendChild(el("div","qflag","anulada — ponto para todos"));
       box.appendChild(row);
     })(i);
   }
+  var presente=fezProva(al);
+  var faixa=el("div","box "+(presente?"box-green":"box-amber"));
+  faixa.style.marginTop="14px";
+  faixa.innerHTML="<b>"+(presente?"Fez a prova":"Sem gabarito lançado")+"</b>"+
+    (presente
+      ? "Este aluno entra na média e na análise das questões."
+      : "Enquanto ficar assim, ele não entra na média nem na análise — e aparece na lista de prováveis ausentes.");
+  var bAus=el("button","btn "+(al.ausente?"btn-secondary":"btn-outline"),
+    al.ausente?"↩︎ Desmarcar ausência":"Marcar como ausente");
+  bAus.type="button";bAus.style.marginTop="10px";
+  bAus.addEventListener("click",function(){
+    if(al.ausente){al.ausente=false;}
+    else{
+      if(!confirm("Marcar "+al.nome+" como ausente? As respostas lançadas para ele serão apagadas."))return;
+      al.ausente=true;al.lancado=false;al.duvidas=[];
+      for(var k=0;k<st.nq;k++)al.respostas[k]=null;
+    }
+    save();renderCorrigir();
+  });
+  faixa.appendChild(bAus);
+  box.appendChild(faixa);
+
   var ac=acertosDe(al);
-  $("corrStatus").innerHTML="#"+String(al.cod).padStart(2,"0")+" "+escapar(al.nome)+" · <strong>"+ac+"/"+st.nq+"</strong> · nota <strong>"+fmt(notaDe(al),1)+"</strong>";
+  $("corrStatus").innerHTML="#"+String(al.cod).padStart(2,"0")+" "+escapar(al.nome)+
+    (presente?" · <strong>"+ac+"/"+st.nq+"</strong> · nota <strong>"+fmt(notaDe(al),1)+"</strong>"
+             :' · <span class="pill pill-amber">sem gabarito</span>');
 }
 $("fAlunoSel").addEventListener("change",function(){st.atual=parseInt(this.value,10);save();renderCorrigir();});
 $("btnAddAluno").addEventListener("click",function(){
@@ -1209,8 +1237,20 @@ $("btnAlunoProx").addEventListener("click",function(){
 });
 
 /* ---------- 5. RESULTADOS ---------- */
+/* Quem não fez a prova não pode entrar na média: zeraria a turma inteira.
+   "Lançado" = teve gabarito lido ou o professor tocou na grade. */
+function fezProva(a){
+  if(a.ausente)return false;
+  if(a.lancado)return true;
+  for(var i=0;i<st.nq;i++)if(a.respostas[i]!=null)return true;
+  return false;
+}
 function analisar(){
-  var alunos=st.alunos.map(function(a){
+  var ausentes=st.alunos.filter(function(a){return !fezProva(a);}).map(function(a){
+    var p=partesAluno(a.nome);
+    return {nome:p.nome,num:p.num,cod:a.cod,motivo:a.ausente?"marcado como ausente":"nenhum gabarito lançado"};
+  });
+  var alunos=st.alunos.filter(fezProva).map(function(a){
     var brancos=0;
     for(var i=0;i<st.nq;i++){
       if(st.anuladas.indexOf(i)>=0)continue;
@@ -1248,7 +1288,8 @@ function analisar(){
     var D=g?(dSup-dInf)/g:0;
     itens.push({i:i,anulada:anulada,gab:st.gabarito[i],dist:dist,branco:branco,acertos:acertos,p:p,D:D});
   }
-  return {alunos:alunos,n:n,media:media,mediana:mediana,min:notas[0]||0,max:notas[n-1]||0,itens:itens,g:g};
+  return {alunos:alunos,n:n,media:media,mediana:mediana,min:notas[0]||0,max:notas[n-1]||0,
+          itens:itens,g:g,ausentes:ausentes,matriculados:st.alunos.length};
 }
 function classDific(p){
   if(p>=0.70)return{t:"fácil",c:"pill-green"};
@@ -1278,8 +1319,15 @@ function renderResultados(){
   var A=analisar();
   var h="";
 
+  if(!A.n){
+    c.innerHTML='<section><div class="card"><div class="empty">Nenhum aluno com gabarito lançado ainda.<br>'+
+      'A turma tem <strong>'+A.matriculados+'</strong> cadastrados, mas nenhum recebeu respostas.</div></div></section>';
+    return;
+  }
+
   h+='<section><h2 class="section-title">📊 Resumo da turma</h2><div class="tiles">'+
-    '<div class="tile"><div class="tile-label">Alunos</div><div class="tile-value">'+A.n+'</div><div class="tile-sub">corrigidos</div></div>'+
+    '<div class="tile"><div class="tile-label">Fizeram</div><div class="tile-value">'+A.n+'</div>'+
+    '<div class="tile-sub">de '+A.matriculados+' da turma</div></div>'+
     '<div class="tile"><div class="tile-label">Média</div><div class="tile-value">'+fmt(A.media,1)+'</div><div class="tile-sub">de '+fmt(st.notaMax,0)+'</div></div>'+
     '<div class="tile"><div class="tile-label">Mediana</div><div class="tile-value">'+fmt(A.mediana,1)+'</div><div class="tile-sub">metade acima</div></div>'+
     '<div class="tile"><div class="tile-label">Amplitude</div><div class="tile-value">'+fmt(A.min,1)+'–'+fmt(A.max,1)+'</div><div class="tile-sub">menor e maior</div></div>'+
@@ -1297,6 +1345,23 @@ function renderResultados(){
   });
   h+='</div></section>';
 
+  // quem não fez a prova
+  if(A.ausentes.length){
+    h+='<section><h2 class="section-title">🚩 Sem gabarito — provável ausência</h2><div class="card">'+
+       '<div class="box box-amber"><b>'+A.ausentes.length+' de '+A.matriculados+' alunos sem prova lançada</b>'+
+       'Estes não entram na média nem na análise das questões — quem não fez não pode ser contado como quem zerou. '+
+       'Confira a lista para segunda chamada, recuperação paralela ou registro no pré-conselho.</div>'+
+       '<div class="table-scroll" style="margin-top:12px"><table><thead><tr>'+
+       '<th>Nº</th><th>Aluno</th><th>Situação</th></tr></thead><tbody>';
+    A.ausentes.forEach(function(a){
+      h+='<tr><td class="num">'+escapar(a.num||"—")+'</td><td>'+escapar(a.nome)+'</td>'+
+         '<td><span class="pill pill-amber">'+escapar(a.motivo)+'</span></td></tr>';
+    });
+    h+='</tbody></table></div>'+
+       '<div class="field-hint">Se algum deles fez a prova e o gabarito não foi lido, volte à etapa 4 e lance à mão — ele entra na análise na hora.</div>'+
+       '</div></section>';
+  }
+
   // alertas
   var alertas=[];
   A.itens.forEach(function(it){
@@ -1307,7 +1372,7 @@ function renderResultados(){
     if(maiorV>it.acertos)alertas.push(q+": o distrator "+maiorD+" foi marcado por mais alunos ("+maiorV+") do que o gabarito "+it.gab+" ("+it.acertos+"). Verifique se o gabarito está certo ou se houve erro de ensino do conceito.");
     if(A.n>=10&&it.D<0.20)alertas.push(q+": não separa quem sabe de quem não sabe (discriminação "+fmt(it.D,2)+"). Candidata a revisão ou substituição.");
     if(it.p<0.20&&A.n>=10)alertas.push(q+": acertada por menos de um quinto da turma. Pode ser item defeituoso ou conteúdo não consolidado.");
-    if(it.branco>=Math.ceil(A.n*0.3))alertas.push(q+": "+it.branco+" alunos deixaram em branco. Pode indicar falta de tempo ou enunciado confuso.");
+    if(it.branco>=Math.ceil(A.n*0.3))alertas.push(q+": "+it.branco+(it.branco===1?" aluno deixou":" alunos deixaram")+" em branco, entre os que fizeram a prova. Pode indicar falta de tempo ou enunciado confuso.");
   });
   if(alertas.length){
     h+='<section><h2 class="section-title">⚠️ Pontos de atenção</h2><div class="card"><div class="box box-amber"><b>O que merece um olhar</b><ul style="margin:4px 0 0;padding-left:18px">';
@@ -1427,7 +1492,9 @@ function montarTsv(A){
   lin([escolaAtual().nome]);
   lin([tituloProva()||"Avaliação"]);
   lin(["Turma",st.turma||"—","Data",st.data?st.data.split("-").reverse().join("/"):"—"]);
-  lin(["Alunos",String(A.n),"Questões",String(st.nq),"Nota máxima",fmt(st.notaMax,0)]);
+  lin(["Matriculados",String(A.matriculados),"Fizeram a prova",String(A.n),
+       "Sem gabarito",String(A.ausentes.length)]);
+  lin(["Questões",String(st.nq),"Nota máxima",fmt(st.notaMax,0)]);
   lin(["Média",fmt(A.media,1),"Mediana",fmt(A.mediana,1),"Menor",fmt(A.min,1),"Maior",fmt(A.max,1)]);
   lin([]);
 
@@ -1444,6 +1511,13 @@ function montarTsv(A){
     lin(l);
   });
   lin([]);
+
+  if(A.ausentes.length){
+    lin(["SEM GABARITO — PROVÁVEL AUSÊNCIA"]);
+    lin(["Nº","Aluno","Situação"]);
+    A.ausentes.forEach(function(a){lin([a.num||"",a.nome,a.motivo]);});
+    lin([]);
+  }
 
   lin(["ANÁLISE POR QUESTÃO"]);
   var cab2=["Questão","Gabarito","Acertos","% de acerto","Dificuldade"];
@@ -1626,6 +1700,16 @@ function areaQuad(p){
   for(var i=0;i<4;i++){var j=(i+1)%4;s+=p[i].x*p[j].y-p[j].x*p[i].y;}
   return Math.abs(s)/2;
 }
+function dentroQuad(q,p){
+  var sinal=0;
+  for(var i=0;i<4;i++){
+    var a=q[i],b=q[(i+1)%4];
+    var cr=(b.x-a.x)*(p.y-a.y)-(b.y-a.y)*(p.x-a.x);
+    var s=cr>0?1:-1;
+    if(sinal===0)sinal=s;else if(s!==sinal)return false;
+  }
+  return true;
+}
 function ordenarCiclico(pts){
   var cx=0,cy=0;
   pts.forEach(function(p){cx+=p.x;cy+=p.y;});
@@ -1665,6 +1749,13 @@ function acharMarcadores(blobs,ref){
     var idx=-1;
     for(var i=0;i<4;i++)if(Q.ord[i].n===grande){idx=i;break;}
     if(idx<0)return;
+    /* os três quadrados são impressos do mesmo tamanho: desigualdade denuncia
+       um impostor, como o brasão da escola */
+    var tres=Q.ord.filter(function(p){return p.n!==grande;}).map(function(p){return p.n;});
+    var mt=(tres[0]+tres[1]+tres[2])/3;
+    var dp=Math.sqrt(tres.reduce(function(s,v){return s+(v-mt)*(v-mt);},0)/3);
+    var cvQuad=mt>0?dp/mt:1;
+    if(cvQuad>0.45)return;
     [1,-1].forEach(function(sentido){
       function at(off){return Q.ord[((idx+off*sentido)%4+4)%4];}
       var BR=at(0),BL=at(1),TL=at(2),TR=at(3);
@@ -1674,8 +1765,18 @@ function acharMarcadores(blobs,ref){
       var erroR=Math.abs(larg/alt-razaoRef)/razaoRef;
       if(erroR>0.40)return;
       var erroA=Math.abs(rel-relRef)/relRef;
-      var score=erroR+0.5*erroA+0.5*(1-Q.ar/maiorArea);
-      if(!melhor||score<melhor.score)melhor={score:score,tl:TL,tr:TR,br:BR,bl:BL};
+      /* o quadrilátero certo cerca a folha inteira: conteúdo do lado de fora
+         significa que um dos cantos está errado */
+      var fora=0,tot=0,cantos=[TL,TR,BR,BL];
+      for(var bi=0;bi<blobs.length;bi++){
+        var bb=blobs[bi];
+        if(cantos.indexOf(bb)>=0)continue;
+        tot++;
+        if(!dentroQuad(cantos,bb))fora++;
+      }
+      var fracFora=tot?fora/tot:0;
+      var score=erroR+0.5*erroA+0.5*(1-Q.ar/maiorArea)+1.0*cvQuad+1.5*fracFora;
+      if(!melhor||score<melhor.score)melhor={score:score,tl:TL,tr:TR,br:BR,bl:BL,fora:fracFora};
     });
   });
   return melhor;
@@ -1915,6 +2016,7 @@ function aplicarLeitura(res){
   var al=st.alunos[st.atual];
   al.respostas=res.respostas.slice();
   al.duvidas=res.duvidas.slice();
+  al.lancado=true;al.ausente=false;
   save();
   $("leituraPainel").hidden=true;$("leituraPainel").innerHTML="";
   renderCorrigir();
@@ -1950,27 +2052,44 @@ $("fFoto").addEventListener("change",function(){
    PDF digitalizado com uma folha por página, ou várias imagens de uma vez.
    O PDF exige a biblioteca pdf.js, carregada só quando o professor usa o recurso. */
 
-var PDFJS_URL="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";
-var PDFJS_WORKER="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+/* A biblioteca fica na mesma pasta do corretor (pdf.min.js e pdf.worker.min.js),
+   para não depender de servidor externo nem de filtro da rede da escola.
+   A internet é só um plano B. */
+var FONTES_PDFJS=[
+  {lib:"pdf.min.js",worker:"pdf.worker.min.js"},
+  {lib:"https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js",
+   worker:"https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js"}
+];
 var pdfjsCarregando=false;
 
 function carregarPdfJs(cb){
   if(window.pdfjsLib){cb(true);return;}
   if(pdfjsCarregando){setTimeout(function(){carregarPdfJs(cb);},300);return;}
   pdfjsCarregando=true;
-  var s=document.createElement("script");
-  s.src=PDFJS_URL;
-  s.onload=function(){
-    try{window.pdfjsLib.GlobalWorkerOptions.workerSrc=PDFJS_WORKER;}catch(e){}
-    cb(!!window.pdfjsLib);
-  };
-  s.onerror=function(){pdfjsCarregando=false;cb(false);};
-  document.head.appendChild(s);
+  var i=0;
+  function tentar(){
+    if(i>=FONTES_PDFJS.length){pdfjsCarregando=false;cb(false);return;}
+    var fonte=FONTES_PDFJS[i];
+    var s=document.createElement("script");
+    s.src=fonte.lib;
+    s.onload=function(){
+      if(window.pdfjsLib){
+        try{window.pdfjsLib.GlobalWorkerOptions.workerSrc=fonte.worker;}catch(e){}
+        pdfjsCarregando=false;cb(true);
+      }else{i++;tentar();}
+    };
+    s.onerror=function(){
+      if(s.parentNode)s.parentNode.removeChild(s);
+      i++;tentar();
+    };
+    document.head.appendChild(s);
+  }
+  tentar();
 }
 
 function paginasDoPdf(file,cb){
   carregarPdfJs(function(ok){
-    if(!ok){cb(null,"Não consegui carregar o leitor de PDF. Verifique a internet, ou peça à multifuncional para gerar imagens JPEG em vez de PDF.");return;}
+    if(!ok){cb(null,"Não encontrei o leitor de PDF. Confira se os arquivos pdf.min.js e pdf.worker.min.js estão na mesma pasta do corretor no GitHub. Enquanto isso, dá para enviar as páginas como imagens JPEG, selecionando várias de uma vez.");return;}
     var fr=new FileReader();
     fr.onload=function(){
       window.pdfjsLib.getDocument({data:new Uint8Array(fr.result)}).promise.then(function(doc){
@@ -1984,7 +2103,9 @@ function paginasDoPdf(file,cb){
                 var v2=pg.getViewport({scale:esc});
                 var cv=document.createElement("canvas");
                 cv.width=Math.round(v2.width);cv.height=Math.round(v2.height);
-                return pg.render({canvasContext:cv.getContext("2d"),viewport:v2}).promise
+                var cx2=cv.getContext("2d");
+                cx2.fillStyle="#fff";cx2.fillRect(0,0,cv.width,cv.height);
+                return pg.render({canvasContext:cx2,viewport:v2}).promise
                   .then(function(){return cv;});
               });
             }});
@@ -2055,51 +2176,87 @@ function mostrarLote(achados){
     r.alvo=idx;
     var seguras=st.nq-r.duvidas.length;
     var quem,sit;
+    var conferir=r.duvidas.length
+      ? ' <span class="pill pill-amber">conferir '+r.duvidas.map(function(q){return q+1;}).join(", ")+'</span>'
+      : ' <span class="pill pill-green">completa</span>';
+    function escolhaManual(motivo){
+      var s='<select class="sel-dono" data-ix="'+ix+'" style="max-width:220px;padding:5px 8px;border-radius:8px;border:1.5px solid var(--amber)">'+
+            '<option value="">— de quem é? —</option>';
+      st.alunos.forEach(function(a,k){
+        s+='<option value="'+k+'">#'+String(a.cod).padStart(2,"0")+" "+escapar(a.nome)+'</option>';
+      });
+      s+='</select><div class="field-hint" style="margin-top:3px">'+motivo+'</div>';
+      return s;
+    }
     if(idx!=null){
       quem="#"+String(r.codigo).padStart(2,"0")+" "+escapar(st.alunos[idx].nome);
       aplicaveis.push(ix);
-      sit=r.duvidas.length
-        ? '<span class="pill pill-amber">conferir '+r.duvidas.map(function(q){return q+1;}).join(", ")+'</span>'
-        : '<span class="pill pill-green">completa</span>';
+      sit=conferir;
     }else if(r.codigoOk&&r.codigo===0){
-      quem="gabarito avulso";
-      sit='<span class="pill pill-amber">sem dono — lance à mão</span>';
+      quem=escolhaManual("Gabarito avulso, sem código. Leia o nome escrito na folha.");
+      sit=conferir;
     }else if(r.codigoOk){
-      quem="código "+r.codigo;
-      sit='<span class="pill pill-red">código não está nesta prova</span>';
+      quem=escolhaManual("O código "+r.codigo+" não pertence a esta prova. É a prova certa?");
+      sit='<span class="pill pill-red">outra prova?</span>';
     }else{
-      quem="—";
-      sit='<span class="pill pill-red">código ilegível</span>';
+      quem=escolhaManual("Código ilegível — pode ter sido rabiscado. Leia o nome na folha.");
+      sit=conferir;
     }
     h+='<tr><td>'+escapar(r.rotulo)+'</td><td>'+quem+'</td>'+
        '<td class="num">'+seguras+"/"+st.nq+'</td><td>'+sit+'</td></tr>';
   });
   h+='</tbody></table></div>';
-  h+='<div class="box '+(aplicaveis.length?"box-green":"box-amber")+'" style="margin-top:12px"><b>Resumo</b>'+
-     aplicaveis.length+" de "+achados.length+" páginas foram associadas a alunos desta prova."+
-     (aplicaveis.length<achados.length?" As demais precisam ser lançadas à mão — abra a lista acima para ver o motivo de cada uma.":"")+
-     '</div>';
+  var semDono=achados.filter(function(r){return !r.erro&&r.alvo==null;}).length;
+  h+='<div class="box '+(semDono?"box-amber":"box-green")+'" style="margin-top:12px"><b>Resumo</b>'+
+     aplicaveis.length+" de "+achados.length+" páginas foram associadas sozinhas aos alunos."+
+     (semDono?" Em "+semDono+" o app leu as respostas mas não soube de quem é a folha — escolha o aluno na tabela acima e elas entram junto.":"")+
+     '</div><div id="avisoDuplicado"></div>';
   h+='<div class="btn-row" style="margin-top:12px">'+
-     (aplicaveis.length?'<button class="btn btn-primary" id="btnAplicarLote" type="button">Aplicar '+aplicaveis.length+' leituras</button>':"")+
+     '<button class="btn btn-primary" id="btnAplicarLote" type="button">Aplicar leituras</button>'+
      '<button class="btn btn-outline" id="btnFecharLote" type="button">Fechar</button></div>';
   h+="</div>";
   painel.innerHTML=h;
-  if(aplicaveis.length){
-    $("btnAplicarLote").addEventListener("click",function(){
-      aplicaveis.forEach(function(ix){
-        var r=achados[ix],al=st.alunos[r.alvo];
-        al.respostas=r.respostas.slice();
-        al.duvidas=r.duvidas.slice();
-      });
-      var comDuvida=aplicaveis.filter(function(ix){return achados[ix].duvidas.length;}).length;
-      save();
-      painel.hidden=true;painel.innerHTML="";
-      renderCorrigir();
-      alert(aplicaveis.length+" gabaritos lançados."+
-        (comDuvida?" "+comDuvida+" têm questões destacadas em âmbar para você conferir, aluno por aluno.":""));
-      window.scrollTo(0,0);
+
+  function destinos(){
+    var mapa=[];
+    aplicaveis.forEach(function(ix){mapa.push({ix:ix,aluno:achados[ix].alvo});});
+    painel.querySelectorAll(".sel-dono").forEach(function(s){
+      if(s.value!=="")mapa.push({ix:parseInt(s.dataset.ix,10),aluno:parseInt(s.value,10)});
     });
+    return mapa;
   }
+  function atualizarBotao(){
+    var m=destinos(),vistos={},dup=[];
+    m.forEach(function(d){
+      if(vistos[d.aluno])dup.push(st.alunos[d.aluno].nome);
+      vistos[d.aluno]=true;
+    });
+    $("btnAplicarLote").textContent="Aplicar "+m.length+(m.length===1?" leitura":" leituras");
+    $("btnAplicarLote").disabled=!m.length||dup.length>0;
+    $("avisoDuplicado").innerHTML=dup.length
+      ? '<div class="box box-red" style="margin-top:10px"><b>Mesmo aluno em duas páginas</b>'+
+        escapar(dup.join(", "))+' — confira qual folha é de quem antes de aplicar.</div>'
+      : "";
+  }
+  painel.querySelectorAll(".sel-dono").forEach(function(s){s.addEventListener("change",atualizarBotao);});
+  atualizarBotao();
+
+  $("btnAplicarLote").addEventListener("click",function(){
+    var m=destinos();
+    m.forEach(function(d){
+      var r=achados[d.ix],al=st.alunos[d.aluno];
+      al.respostas=r.respostas.slice();
+      al.duvidas=r.duvidas.slice();
+      al.lancado=true;al.ausente=false;
+    });
+    var comDuvida=m.filter(function(d){return achados[d.ix].duvidas.length;}).length;
+    save();
+    painel.hidden=true;painel.innerHTML="";
+    renderCorrigir();
+    alert(m.length+" gabaritos lançados."+
+      (comDuvida?" "+comDuvida+" têm questões destacadas em âmbar para você conferir, aluno por aluno.":""));
+    window.scrollTo(0,0);
+  });
   $("btnFecharLote").addEventListener("click",function(){painel.hidden=true;painel.innerHTML="";});
 }
 
