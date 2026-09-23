@@ -1419,10 +1419,10 @@ function renderResultados(){
     var q="Questão "+(it.i+1);
     var maiorD=null,maiorV=-1;
     for(var L in it.dist){if(L!==it.gab&&it.dist[L]>maiorV){maiorV=it.dist[L];maiorD=L;}}
-    if(maiorV>it.acertos)alertas.push(q+": o distrator "+maiorD+" foi marcado por mais alunos ("+maiorV+") do que o gabarito "+it.gab+" ("+it.acertos+"). Verifique se o gabarito está certo ou se houve erro de ensino do conceito.");
-    if(A.n>=10&&it.D<0.20)alertas.push(q+": não separa quem sabe de quem não sabe (discriminação "+fmt(it.D,2)+"). Candidata a revisão ou substituição.");
-    if(it.p<0.20&&A.n>=10)alertas.push(q+": acertada por menos de um quinto da turma. Pode ser item defeituoso ou conteúdo não consolidado.");
-    if(it.branco>=Math.ceil(A.n*0.3))alertas.push(q+": "+it.branco+(it.branco===1?" aluno deixou":" alunos deixaram")+" em branco, entre os que fizeram a prova. Pode indicar falta de tempo ou enunciado confuso.");
+    if(maiorV>it.acertos)alertas.push(q+": a alternativa "+maiorD+" foi marcada por mais alunos ("+maiorV+") do que o gabarito "+it.gab+" ("+it.acertos+"). Confira primeiro se o gabarito cadastrado está correto; se estiver, vale retomar o conceito, porque a turma convergiu para outro entendimento.");
+    if(A.n>=10&&it.D<0.20)alertas.push(q+": foi acertada por alunos de desempenhos muito diferentes (discriminação "+fmt(it.D,2)+"), então pouco informa sobre o domínio do conteúdo. Vale revisar o enunciado e as alternativas para torná-los mais precisos.");
+    if(it.p<0.20&&A.n>=10)alertas.push(q+": acertada por menos de um quinto da turma. Pode ser um enunciado que precisa ficar mais claro, ou um conteúdo que ainda pede retomada antes de ser avaliado.");
+    if(it.branco>=Math.ceil(A.n*0.3))alertas.push(q+": "+it.branco+(it.branco===1?" aluno deixou":" alunos deixaram")+" em branco, entre os que fizeram a prova. Pode indicar falta de tempo na aplicação ou um enunciado que precisa ficar mais claro.");
   });
   if(alertas.length){
     h+='<section><h2 class="section-title">⚠️ Pontos de atenção</h2><div class="card"><div class="box box-amber"><b>O que merece um olhar</b><ul style="margin:4px 0 0;padding-left:18px">';
@@ -1472,7 +1472,7 @@ function renderResultados(){
   // itens
   h+='<section class="no-print"><h2 class="section-title">🔍 Análise questão a questão</h2>';
   if(A.n<10){
-    h+='<div class="box box-amber" style="margin-bottom:12px"><b>Amostra pequena</b>Com '+A.n+' alunos corrigidos, a discriminação e a dificuldade ainda são instáveis. Os números abaixo servem de indício, não de conclusão — corrija a turma inteira antes de decidir aposentar uma questão.</div>';
+    h+='<div class="box box-amber" style="margin-bottom:12px"><b>Amostra pequena</b>Com '+A.n+' alunos corrigidos, a discriminação e a dificuldade ainda são instáveis. Os números abaixo servem de indício, não de conclusão — corrija a turma inteira antes de decidir revisar ou substituir uma questão.</div>';
   }
   A.itens.forEach(function(it){
     var df=classDific(it.p),ds=classDisc(it.D);
@@ -1495,7 +1495,17 @@ function renderResultados(){
       if(it.branco)h+=barra("em branco",it.branco,maxV,"fill-gray",it.branco);
       var mortos=[];
       for(var k=0;k<st.nalt;k++){var LL=LETRAS[k];if(LL!==it.gab&&it.dist[LL]===0)mortos.push(LL);}
-      if(mortos.length)h+='<div class="item-note">Distrator sem nenhuma marcação: '+mortos.join(", ")+'. Ninguém considerou essa alternativa — ela não captura erro real e pode ser substituída.</div>';
+      if(mortos.length){
+        var um=mortos.length===1;
+        h+='<div class="item-note">'+
+           (um?'Alternativa errada que ninguém marcou: ':'Alternativas erradas que ninguém marcou: ')+
+           mortos.join(", ")+'. '+
+           (um?'Como ela não representa ':'Como não representam ')+
+           'um erro que a turma cometeria, '+
+           (um?'pode ser trocada':'podem ser trocadas')+
+           ' por '+(um?'outra':'outras')+' mais próxima'+(um?'':'s')+
+           ' do raciocínio real dos alunos.</div>';
+      }
     }else{
       h+='<div class="item-note">Questão anulada: vale ponto para todos os alunos e não entra na análise.</div>';
     }
