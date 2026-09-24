@@ -156,6 +156,9 @@ td.num{text-align:right;font-variant-numeric:tabular-nums;}
 .item-title{font-size:14px;font-weight:700;color:var(--text);}
 .item-pills{display:flex;gap:6px;flex-wrap:wrap;}
 .item-note{font-size:12.5px;line-height:1.6;margin-top:10px;padding-top:10px;border-top:1px solid var(--gray-light);color:var(--text-muted);}
+.item-lab{margin-top:10px;padding-top:10px;border-top:1px solid var(--gray-light);display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;}
+.btn-mini{padding:7px 13px;font-size:12.5px;}
+.item-lab-hint{font-size:12px;line-height:1.55;color:var(--text-muted);flex:1;min-width:190px;}
 .item-note.alert{color:var(--red);font-weight:600;}
 
 .export-box{border:1.5px solid var(--gray-mid);border-radius:10px;background:#fbfcfe;max-height:220px;overflow:auto;}
@@ -1341,6 +1344,58 @@ function analisar(){
   return {alunos:alunos,n:n,media:media,mediana:mediana,min:notas[0]||0,max:notas[n-1]||0,
           itens:itens,g:g,ausentes:ausentes,matriculados:st.alunos.length};
 }
+/* ---- ponte com o Laboratório de Itens ----
+   O corretor sabe como a questão se comportou, mas não conhece o enunciado.
+   Então ele monta o bloco de dados e o professor cola a questão por cima. */
+var URL_LAB="https://eejm2026.github.io/laboratorio-de-itens/";
+
+function pedeRevisao(it,A){
+  if(it.anulada)return false;
+  var maiorV=-1;
+  for(var L in it.dist){if(L!==it.gab&&it.dist[L]>maiorV)maiorV=it.dist[L];}
+  if(maiorV>it.acertos)return true;
+  if(A.n>=10&&it.D<0.20)return true;
+  if(A.n>=10&&it.p<0.20)return true;
+  if(it.branco>=Math.ceil(A.n*0.3))return true;
+  for(var k=0;k<st.nalt;k++){var LL=LETRAS[k];if(LL!==it.gab&&it.dist[LL]===0)return true;}
+  return false;
+}
+
+function blocoParaLab(it,A){
+  var ident=[];
+  if(st.disciplina)ident.push(st.disciplina);
+  if(st.turma)ident.push(st.turma);
+  if(st.bimestre)ident.push(st.bimestre);
+  var marc=[],mortos=[],maiorD=null,maiorV=-1;
+  for(var k=0;k<st.nalt;k++){
+    var L=LETRAS[k],v=it.dist[L];
+    marc.push(L+" "+v+(L===it.gab?" (gabarito)":""));
+    if(L!==it.gab){
+      if(v===0)mortos.push(L);
+      if(v>maiorV){maiorV=v;maiorD=L;}
+    }
+  }
+  var t=[];
+  t.push("Analise se esta questão está avaliando o que eu pretendo e, se fizer sentido, reformule.");
+  t.push("");
+  if(ident.length)t.push(ident.join(" · "));
+  t.push("Questão "+(it.i+1)+" · gabarito "+it.gab+" · "+st.nalt+" alternativas");
+  t.push("");
+  t.push("Como a turma se comportou (Corretor de Gabaritos, "+A.n+
+         (A.n===1?" aluno":" alunos")+" que fizeram a prova):");
+  t.push("- acertos: "+it.acertos+" ("+pct(it.p)+"%)");
+  t.push("- marcações por alternativa: "+marc.join(" · "));
+  t.push("- em branco: "+it.branco);
+  if(A.n>=10)t.push("- discriminação: "+fmt(it.D,2));
+  if(mortos.length)t.push("- alternativas que ninguém marcou: "+mortos.join(", "));
+  if(maiorV>it.acertos)t.push("- a alternativa "+maiorD+" foi marcada por mais alunos ("+maiorV+
+                              ") do que o gabarito "+it.gab+" ("+it.acertos+")");
+  t.push("");
+  t.push("QUESTÃO — colar abaixo o enunciado e as alternativas:");
+  t.push("");
+  return t.join("\n");
+}
+
 function classDific(p){
   if(p>=0.70)return{t:"fácil",c:"pill-green"};
   if(p>=0.30)return{t:"média",c:"pill-blue"};
@@ -1427,7 +1482,12 @@ function renderResultados(){
   if(alertas.length){
     h+='<section><h2 class="section-title">⚠️ Pontos de atenção</h2><div class="card"><div class="box box-amber"><b>O que merece um olhar</b><ul style="margin:4px 0 0;padding-left:18px">';
     alertas.forEach(function(a){h+='<li style="margin-bottom:5px">'+escapar(a)+'</li>';});
-    h+='</ul></div></div></section>';
+    h+='</ul></div>'+
+       '<div class="field-hint">Nenhum desses pontos exige decisão agora. Em cada questão, mais abaixo, '+
+       'há um botão que copia esses números em texto pronto para levar ao '+
+       '<a href="'+URL_LAB+'" target="_blank" rel="noopener">Laboratório de Itens</a>, '+
+       'que analisa a intenção da questão e devolve uma versão revisada.</div>'+
+       '</div></section>';
   }
 
   // alunos
@@ -1506,6 +1566,15 @@ function renderResultados(){
            ' por '+(um?'outra':'outras')+' mais próxima'+(um?'':'s')+
            ' do raciocínio real dos alunos.</div>';
       }
+      if(pedeRevisao(it,A)){
+        h+='<div class="item-lab">'+
+           '<button class="btn btn-secondary btn-mini" type="button" data-lab="'+it.i+'">'+
+           '🧪 Copiar para o Laboratório de Itens</button>'+
+           '<span class="item-lab-hint">Copia os números desta questão em um texto pronto. '+
+           'Cole no <a href="'+URL_LAB+'" target="_blank" rel="noopener">Laboratório de Itens</a>, '+
+           'acrescente o enunciado e ele analisa ou reformula com você.</span>'+
+           '</div>';
+      }
     }else{
       h+='<div class="item-note">Questão anulada: vale ponto para todos os alunos e não entra na análise.</div>';
     }
@@ -1542,6 +1611,13 @@ function renderResultados(){
   c.innerHTML=h;
   $("csvOut").textContent=montarTsv(A);
   $("btnCopiarCsv").addEventListener("click",function(){copiar(montarTsv(A),this);});
+  c.querySelectorAll("[data-lab]").forEach(function(b){
+    b.addEventListener("click",function(){
+      var idx=parseInt(b.dataset.lab,10),alvo=null;
+      A.itens.forEach(function(x){if(x.i===idx)alvo=x;});
+      if(alvo)copiar(blocoParaLab(alvo,A),b);
+    });
+  });
   $("btnPdf").addEventListener("click",function(){window.print();});
 }
 
