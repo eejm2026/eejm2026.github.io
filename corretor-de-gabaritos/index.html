@@ -156,6 +156,8 @@ td.num{text-align:right;font-variant-numeric:tabular-nums;}
 .item-title{font-size:14px;font-weight:700;color:var(--text);}
 .item-pills{display:flex;gap:6px;flex-wrap:wrap;}
 .item-note{font-size:12.5px;line-height:1.6;margin-top:10px;padding-top:10px;border-top:1px solid var(--gray-light);color:var(--text-muted);}
+.recorte-nome{margin-top:5px;border:1px solid var(--gray-mid);border-radius:6px;overflow:hidden;background:var(--white);max-width:260px;}
+.recorte-nome img{display:block;width:100%;height:auto;}
 .item-lab{margin-top:10px;padding-top:10px;border-top:1px solid var(--gray-light);display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;}
 .btn-mini{padding:7px 13px;font-size:12.5px;}
 .item-lab-hint{font-size:12px;line-height:1.55;color:var(--text-muted);flex:1;min-width:190px;}
@@ -1344,10 +1346,10 @@ function analisar(){
   return {alunos:alunos,n:n,media:media,mediana:mediana,min:notas[0]||0,max:notas[n-1]||0,
           itens:itens,g:g,ausentes:ausentes,matriculados:st.alunos.length};
 }
-/* ---- ponte com o Laboratório de Itens ----
+/* ---- ponte com o Laboratório de Questões ----
    O corretor sabe como a questão se comportou, mas não conhece o enunciado.
    Então ele monta o bloco de dados e o professor cola a questão por cima. */
-var URL_LAB="https://eejm2026.github.io/laboratorio-de-itens/";
+var URL_LAB="https://eejm2026.github.io/laboratorio-de-questoes/";
 
 function pedeRevisao(it,A){
   if(it.anulada)return false;
@@ -1485,7 +1487,7 @@ function renderResultados(){
     h+='</ul></div>'+
        '<div class="field-hint">Nenhum desses pontos exige decisão agora. Em cada questão, mais abaixo, '+
        'há um botão que copia esses números em texto pronto para levar ao '+
-       '<a href="'+URL_LAB+'" target="_blank" rel="noopener">Laboratório de Itens</a>, '+
+       '<a href="'+URL_LAB+'" target="_blank" rel="noopener">Laboratório de Questões</a>, '+
        'que analisa a intenção da questão e devolve uma versão revisada.</div>'+
        '</div></section>';
   }
@@ -1569,9 +1571,9 @@ function renderResultados(){
       if(pedeRevisao(it,A)){
         h+='<div class="item-lab">'+
            '<button class="btn btn-secondary btn-mini" type="button" data-lab="'+it.i+'">'+
-           '🧪 Copiar para o Laboratório de Itens</button>'+
+           '🧪 Copiar para o Laboratório de Questões</button>'+
            '<span class="item-lab-hint">Copia os números desta questão em um texto pronto. '+
-           'Cole no <a href="'+URL_LAB+'" target="_blank" rel="noopener">Laboratório de Itens</a>, '+
+           'Cole no <a href="'+URL_LAB+'" target="_blank" rel="noopener">Laboratório de Questões</a>, '+
            'acrescente o enunciado e ele analisa ou reformula com você.</span>'+
            '</div>';
       }
@@ -1741,9 +1743,17 @@ function medirGabarito(){
     var c=centro(el);c.bit=parseInt(el.dataset.bit,10);codigo.push(c);
   });
   codigo.sort(function(a,b){return a.bit-b.bit;});
+  /* retângulo da linha do nome: serve para recortar da digitalização o nome
+     escrito, quando o código não identifica o dono da folha */
+  var campoNome=null;
+  var elNome=slip.querySelector(".slip-field.f-nome");
+  if(elNome){
+    var rn=elNome.getBoundingClientRect();
+    campoNome={x:rn.left-base.left,y:rn.top-base.top,w:rn.width,h:rn.height};
+  }
   var ok=m.tl&&m.tr&&m.br&&m.bl&&bolhas.length===st.nq*st.nalt;
   box.innerHTML="";
-  return ok?{marcas:m,bolhas:bolhas,codigo:codigo}:null;
+  return ok?{marcas:m,bolhas:bolhas,codigo:codigo,campoNome:campoNome}:null;
 }
 
 function carregarImagem(file,cb){
@@ -1858,10 +1868,55 @@ function ordenarCiclico(pts){
 /* Identifica os quatro cantos. O marcador inferior direito é reconhecido pela ÁREA,
    não pelo formato da caixa: girado a 45 graus ele fica quadrado e o critério de
    forma falhava. A área não muda com a rotação. */
+/* Contorno externo (envoltória convexa) dos centros dos blobs, em cadeia
+   monótona. Devolve os blobs que ficam no contorno. */
+function envoltoria(pts){
+  if(pts.length<3)return pts.slice();
+  var p=pts.slice().sort(function(a,b){return a.x-b.x||a.y-b.y;});
+  function cruz(o,a,b){return (a.x-o.x)*(b.y-o.y)-(a.y-o.y)*(b.x-o.x);}
+  var baixo=[],cima=[],i;
+  for(i=0;i<p.length;i++){
+    while(baixo.length>=2&&cruz(baixo[baixo.length-2],baixo[baixo.length-1],p[i])<=0)baixo.pop();
+    baixo.push(p[i]);
+  }
+  for(i=p.length-1;i>=0;i--){
+    while(cima.length>=2&&cruz(cima[cima.length-2],cima[cima.length-1],p[i])<=0)cima.pop();
+    cima.push(p[i]);
+  }
+  baixo.pop();cima.pop();
+  return baixo.concat(cima);
+}
+
 function acharMarcadores(blobs,ref){
-  var cand=blobs.slice().sort(function(a,b){return b.n-a.n;}).slice(0,16);
+  /* Candidatos por tamanho E por afastamento do centro.
+     Só por tamanho não serve: uma bolha de 6 mm bem pintada é maior que um
+     marcador de 4 mm, e uma turma que pinta firme empurra os marcadores para
+     fora da lista. Os quatro marcadores são, por construção, os pontos de
+     tinta mais afastados do centro da folha. */
+  var porTam=blobs.slice().sort(function(a,b){return b.n-a.n;});
+  var cand=porTam.slice(0,8);
+  /* Os marcadores estão nos quatro cantos, fora de todo o resto da impressão:
+     são vértices do contorno externo da tinta. Duas camadas de contorno cobrem
+     o caso de um deles ficar encoberto por um borrão vizinho. Ordenar só por
+     tamanho não bastava — bolha bem pintada é maior que marcador — e ordenar
+     por distância do centro trazia letras do cabeçalho na frente deles. */
+  var resto=blobs.slice();
+  for(var camada=0;camada<2&&resto.length>=3;camada++){
+    var casco=envoltoria(resto);
+    for(var hi=0;hi<casco.length;hi++){
+      if(cand.indexOf(casco[hi])<0)cand.push(casco[hi]);
+      var pos=resto.indexOf(casco[hi]);
+      if(pos>=0)resto.splice(pos,1);
+    }
+  }
+  if(cand.length>26)cand=cand.slice(0,26);
   if(cand.length<4)return null;
   var razaoRef=dist(ref.marcas.tl,ref.marcas.tr)/dist(ref.marcas.tl,ref.marcas.bl);
+  /* quanto o lado do marcador pequeno mede em relação à largura da folha:
+     é o que separa o quadrilátero certo de um menor formado por marcador
+     verdadeiro + traço qualquer — ali os marcadores ficam grandes demais
+     para o quadrilátero que eles supostamente delimitam */
+  var escalaRef=(ref.marcas.tl.r*2)/dist(ref.marcas.tl,ref.marcas.tr);
   var areaRef=(ref.marcas.br.r*2)/(ref.marcas.tl.r*2);
   var relRef=Math.max(1.6,areaRef*areaRef);
   var quads=[],maiorArea=0;
@@ -1901,17 +1956,27 @@ function acharMarcadores(blobs,ref){
       var erroR=Math.abs(larg/alt-razaoRef)/razaoRef;
       if(erroR>0.40)return;
       var erroA=Math.abs(rel-relRef)/relRef;
+      var ladoPeq=Math.sqrt(Math.max(1,mt));
+      var erroEsc=Math.abs((ladoPeq/larg)/escalaRef-1);
+      if(erroEsc>0.55)return;
       /* o quadrilátero certo cerca a folha inteira: conteúdo do lado de fora
          significa que um dos cantos está errado */
-      var fora=0,tot=0,cantos=[TL,TR,BR,BL];
+      var fora=0,tot=0,forteFora=0,cantos=[TL,TR,BR,BL];
       for(var bi=0;bi<blobs.length;bi++){
         var bb=blobs[bi];
         if(cantos.indexOf(bb)>=0)continue;
         tot++;
-        if(!dentroQuad(cantos,bb))fora++;
+        if(!dentroQuad(cantos,bb)){
+          fora++;
+          /* nada do tamanho de um marcador pode sobrar fora do quadrilátero:
+             se sobrou, é porque um marcador de verdade ficou de fora e uma
+             bolha bem pintada entrou no lugar dele */
+          if(bb.n>=mt*0.6)forteFora++;
+        }
       }
       var fracFora=tot?fora/tot:0;
-      var score=erroR+0.5*erroA+0.5*(1-Q.ar/maiorArea)+1.0*cvQuad+1.5*fracFora;
+      var score=erroR+0.5*erroA+0.5*(1-Q.ar/maiorArea)+1.0*cvQuad+1.5*fracFora
+                +2.0*erroEsc+1.2*Math.min(4,forteFora);
       if(!melhor||score<melhor.score)melhor={score:score,tl:TL,tr:TR,br:BR,bl:BL,fora:fracFora};
     });
   });
@@ -1978,6 +2043,30 @@ function mediaAnel(im,cx,cy,r1,r2){
   return n?s/n:255;
 }
 
+/* Recorta da digitalização um retângulo do gabarito já desentortado — usado
+   para mostrar ao professor o nome escrito na folha, que é o que resolve
+   quando o código falha ou quando a folha mudou de dono. */
+function recortarCampo(im,H,ajustar,rect,larguraAlvo){
+  if(!rect||!rect.w||!rect.h)return null;
+  var esc=Math.max(1,Math.min(3,larguraAlvo/rect.w));
+  var w=Math.round(rect.w*esc),h=Math.round(rect.h*esc);
+  if(w<8||h<4||w*h>900000)return null;
+  try{
+    var cv=document.createElement("canvas");cv.width=w;cv.height=h;
+    var cx=cv.getContext("2d"),out=cx.createImageData(w,h);
+    for(var y=0;y<h;y++)for(var x=0;x<w;x++){
+      var q0=ajustar({x:rect.x+x/esc,y:rect.y+y/esc});
+      var p=aplicarH(H,q0.x,q0.y);
+      var xi=Math.round(p.x),yi=Math.round(p.y),v=255;
+      if(xi>=0&&yi>=0&&xi<im.w&&yi<im.h)v=im.g[yi*im.w+xi];
+      var k=(y*w+x)*4;
+      out.data[k]=out.data[k+1]=out.data[k+2]=v;out.data[k+3]=255;
+    }
+    cx.putImageData(out,0,0);
+    return cv.toDataURL("image/png");
+  }catch(e){return null;}
+}
+
 function lerFoto(cv){
   var ref=medirGabarito();
   if(!ref)return {erro:"Não consegui montar o modelo do gabarito. Confira o número de questões na etapa 1."};
@@ -1993,40 +2082,150 @@ function lerFoto(cv){
     var a=aplicarH(H,p.x,p.y),b2=aplicarH(H,p.x+rRef,p.y);
     return Math.max(2,Math.hypot(b2.x-a.x,b2.y-a.y));
   }
+  var ajustar=function(p){return p;};
+  function projetar(p){var q=ajustar(p);return aplicarH(H,q.x,q.y);}
 
-  // código do aluno
-  var bitsLidos=[],detCod=[],duvidoso=false;
-  ref.codigo.forEach(function(c){
-    var p=aplicarH(H,c.x,c.y),r=escalaEm(c,c.r);
-    var dentro=mediaDisco(im,p.x,p.y,r*0.5);
-    var fora=mediaAnel(im,p.x,p.y,r*1.5,r*2.2);
-    var esc=Math.max(0,(fora-dentro))/255;
-    /* quadrado impresso é preto sólido e o vazio é papel: valor no meio
-       significa que a amostragem caiu fora do quadrado */
-    if(esc>0.15&&esc<0.42)duvidoso=true;
-    bitsLidos.push(esc>0.28?1:0);
-    detCod.push({x:p.x,y:p.y,r:r,esc:esc});
-  });
-  var codigo=null,codigoOk=false;
-  if(bitsLidos.length===8&&!duvidoso){
-    var uns=0;
-    for(var i=0;i<7;i++)if(bitsLidos[i])uns++;
-    if(uns%2===bitsLidos[7]){
-      codigo=bitsLidos.slice(0,7).reduce(function(v,x){return v*2+x;},0);
-      codigoOk=true;
+  /* Reencaixe da grade.
+     A homografia acerta os quatro marcadores, mas um marcador borrado na
+     impressão desloca o centro detectado e a folha inteira sai 1 a 2% maior.
+     No meio da folha isso vira meio círculo de erro — a coluna do meio lia
+     tudo em branco. Os 60 círculos impressos são pontos de referência muito
+     melhores que quatro cantos: procura-se o pequeno ajuste (deslocamento e
+     escala, em coordenadas do modelo) que faz o traço dos círculos coincidir. */
+  var ajX=0,ajY=0,ajSX=1,ajSY=1;
+  (function(){
+    var bs=ref.bolhas;
+    if(bs.length<8)return;
+    var cxT=0,cyT=0;
+    bs.forEach(function(b){cxT+=b.x/bs.length;cyT+=b.y/bs.length;});
+    var rT=bs[0].r,passoA=Math.max(2,Math.round(bs.length/24));
+    var rImg=escalaEm(bs[0],bs[0].r);
+    function nota(dx,dy,sx,sy){
+      var s=0;
+      for(var i=0;i<bs.length;i+=passoA){
+        var b=bs[i];
+        var p=aplicarH(H,cxT+(b.x-cxT)*sx+dx,cyT+(b.y-cyT)*sy+dy);
+        s+=mediaAnel(im,p.x,p.y,rImg*1.3,rImg*1.7)
+          -mediaAnel(im,p.x,p.y,rImg*0.82,rImg*1.12);
+      }
+      return s;
     }
-  }
+    var melhor=nota(0,0,1,1);
+    var faixas=[[0,rT*0.16],[1,rT*0.16],[2,0.008],[3,0.008]];
+    for(var rodada=0;rodada<3;rodada++){
+      for(var f=0;f<faixas.length;f++){
+        var qual=faixas[f][0],amp=faixas[f][1],base=[ajX,ajY,ajSX,ajSY];
+        for(var k=-3;k<=3;k++){
+          if(!k)continue;
+          var v=base.slice();v[qual]=base[qual]+k*amp;
+          var n=nota(v[0],v[1],v[2],v[3]);
+          if(n>melhor){melhor=n;ajX=v[0];ajY=v[1];ajSX=v[2];ajSY=v[3];}
+        }
+      }
+      faixas=faixas.map(function(f2){return [f2[0],f2[1]*0.5];});
+    }
+    var cT={x:cxT,y:cyT};
+    ajustar=function(p){
+      return {x:cT.x+(p.x-cT.x)*ajSX+ajX, y:cT.y+(p.y-cT.y)*ajSY+ajY};
+    };
+  })();
+
+  /* Referências globais de tinta e de papel.
+     Os marcadores dos cantos são preto sólido; o entorno das bolhas é papel.
+     A leitura do código passa a comparar com esses dois valores da própria
+     folha, em vez de com um anel vizinho — que caía em cima das casinhas ao
+     lado e achatava o contraste de qualquer código com casinhas seguidas. */
+  var rMarca=escalaEm(ref.marcas.tl,ref.marcas.tl.r);
+  var tintas=["tl","tr","br","bl"].map(function(k){
+    return mediaDisco(im,M[k].x,M[k].y,Math.max(2,rMarca*0.45));
+  }).sort(function(a,b){return a-b;});
+  var tinta=(tintas[1]+tintas[2])/2;
 
   // bolhas
-  var porQ={};
+  var porQ={},papeis=[];
   ref.bolhas.forEach(function(b){
-    var p=aplicarH(H,b.x,b.y),r=escalaEm(b,b.r);
+    var p=projetar(b),r=escalaEm(b,b.r);
     var dentro=mediaDisco(im,p.x,p.y,r*0.66);
     var fora=mediaAnel(im,p.x,p.y,r*1.3,r*1.75);
+    papeis.push(fora);
     var esc=Math.max(0,fora-dentro)/255;
     if(!porQ[b.q])porQ[b.q]=[];
     porQ[b.q][b.a]={esc:esc,x:p.x,y:p.y,r:r};
   });
+  papeis.sort(function(a,b){return a-b;});
+  var papel=papeis[Math.floor(papeis.length*0.6)]||255;
+  if(papel-tinta<30){papel=255;tinta=0;}
+
+  // código do aluno
+  var bitsLidos=[],detCod=[],duvidoso=false,codigo=null,codigoOk=false;
+  if(ref.codigo.length===8){
+    var cs=ref.codigo.map(function(c){return projetar(c);});
+    var rc=escalaEm(ref.codigo[0],ref.codigo[0].r);
+    var meio=(papel+tinta)/2,faixaC=Math.max(1,papel-tinta);
+    var rMio=Math.max(1.5,rc*0.42),rVao=Math.max(1.5,rc*0.3),rPt=Math.max(1,rc*0.16);
+    var LADOS=[[0.93,0],[-0.93,0],[0,0.93],[0,-0.93]];
+    /* A homografia acerta os quatro cantos, mas sobra um erro de 1 a 2 mm no
+       meio da folha — inofensivo para bolhas de 6 mm, fatal para casinhas de
+       3,2 mm. Então a tira inteira é reencaixada: procura-se o deslocamento em
+       que os vãos ficam claros e cada miolo fica claramente claro ou escuro. */
+    var cenX=0,cenY=0;
+    cs.forEach(function(p){cenX+=p.x/cs.length;cenY+=p.y/cs.length;});
+    function posEm(i,dx,dy,s){
+      return {x:cenX+(cs[i].x-cenX)*s+dx, y:cenY+(cs[i].y-cenY)*s+dy};
+    }
+    function pontuarTira(dx,dy,s){
+      var vaoMin=1e9;
+      for(var i=0;i<cs.length-1;i++){
+        var a=posEm(i,dx,dy,s),b2=posEm(i+1,dx,dy,s);
+        var v=mediaDisco(im,(a.x+b2.x)/2,(a.y+b2.y)/2,rVao);
+        if(v<vaoMin)vaoMin=v;
+      }
+      vaoMin=(vaoMin-tinta)/faixaC;                  /* todo vão é papel        */
+      var sep=0,bordaMin=1e9;
+      for(var j=0;j<cs.length;j++){
+        var q=posEm(j,dx,dy,s);
+        sep+=Math.abs(mediaDisco(im,q.x,q.y,rMio)-meio);
+        var b4=0;
+        for(var k=0;k<4;k++){
+          b4+=mediaDisco(im,q.x+LADOS[k][0]*rc,q.y+LADOS[k][1]*rc,rPt);
+        }
+        b4=(papel-b4/4)/faixaC;
+        if(b4<bordaMin)bordaMin=b4;
+      }
+      sep=(sep/cs.length)/(faixaC/2);                /* miolo bem de um lado    */
+      /* Mínimo, não média: toda casinha tem borda e todo vão é papel. Assim um
+         encaixe deslocado de uma casinha inteira — que joga a última para fora
+         da tira, no papel limpo — é rejeitado. Com média, ele passava, porque
+         as outras sete continuavam encaixando. */
+      return vaoMin+sep+2*bordaMin;
+    }
+    /* além do deslocamento, um pequeno erro de escala: um marcador borrado ou
+       cortado move o centro detectado e a tira inteira estica um pouco */
+    var ESCALAS=[0.98,1,1.02];
+    var melhorS=-1,ox=0,oy=0,oe=1,passo=Math.max(1,rc*0.15),lim=rc*1.2;
+    for(var ei=0;ei<ESCALAS.length;ei++)
+      for(var dy=-lim;dy<=lim;dy+=passo)for(var dx=-lim;dx<=lim;dx+=passo){
+        var sc=pontuarTira(dx,dy,ESCALAS[ei]);
+        if(sc>melhorS){melhorS=sc;ox=dx;oy=dy;oe=ESCALAS[ei];}
+      }
+    var faixa=Math.max(1,papel-tinta);
+    cs.forEach(function(p,ic){
+      var q=posEm(ic,ox,oy,oe);
+      var dentro=mediaDisco(im,q.x,q.y,rMio);
+      var rel=(papel-dentro)/faixa;
+      if(rel>0.30&&rel<0.70)duvidoso=true;
+      bitsLidos.push(rel>0.5?1:0);
+      detCod.push({x:q.x,y:q.y,r:rc,esc:Math.max(0,Math.min(1,rel))});
+    });
+    if(!duvidoso){
+      var uns=0;
+      for(var i=0;i<7;i++)if(bitsLidos[i])uns++;
+      if(uns%2===bitsLidos[7]){
+        codigo=bitsLidos.slice(0,7).reduce(function(v,x){return v*2+x;},0);
+        codigoOk=true;
+      }
+    }
+  }
 
   /* Limiar calibrado pela própria folha: a maioria das bolhas está vazia, então a
      mediana descreve o papel impresso e o topo descreve o que foi pintado.
@@ -2061,7 +2260,9 @@ function lerFoto(cv){
     detalhe.push({q:q,estado:estado,linha:linha,melhor:melhor});
   }
   return {respostas:respostas,duvidas:duvidas,codigo:codigo,codigoOk:codigoOk,
-          im:im,marcas:M,detalhe:detalhe,detCod:detCod,cv:cv};
+          im:im,marcas:M,detalhe:detalhe,detCod:detCod,cv:cv,
+          ajuste:{x:ajX,y:ajY,sx:ajSX,sy:ajSY},
+          recorteNome:recortarCampo(im,H,ajustar,ref.campoNome,420)};
 }
 
 function desenharDebug(res){
@@ -2283,6 +2484,10 @@ function processarLote(paginas){
       var res;
       try{res=lerFoto(cv);}catch(e){res={erro:"Falha ao processar: "+e.message};}
       res.rotulo=pg.rotulo;
+      /* uma turma inteira são dezenas de imagens grandes: sem soltar cada uma,
+         o navegador do celular derruba a página no meio do lote */
+      delete res.im;delete res.cv;
+      try{cv.width=1;cv.height=1;}catch(e2){}
       achados.push(res);
       i++;setTimeout(passo,20);
     }).catch(function(){
@@ -2324,7 +2529,11 @@ function mostrarLote(achados){
       st.alunos.forEach(function(a,k){
         s+='<option value="'+k+'">#'+String(a.cod).padStart(2,"0")+" "+escapar(a.nome)+'</option>';
       });
-      s+='</select><div class="field-hint" style="margin-top:3px">'+motivo+'</div>';
+      s+='</select>';
+      if(r.recorteNome){
+        s+='<div class="recorte-nome"><img src="'+r.recorteNome+'" alt="Nome escrito nesta folha"></div>';
+      }
+      s+='<div class="field-hint" style="margin-top:3px">'+motivo+'</div>';
       return s;
     }
     if(idx!=null){
