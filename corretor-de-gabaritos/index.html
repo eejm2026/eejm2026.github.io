@@ -557,7 +557,8 @@ details.dbg summary{cursor:pointer;font-size:12.5px;font-weight:600;color:var(--
 
 <div class="footer no-print">
   Ferramenta desenvolvida pelo <strong>PCPI Thiago Vareiro Valério</strong> — EE Joaquim Murtinho, Campo Grande/MS<br>
-  Gratuita · sem cadastro · dados apenas neste aparelho · aberta a qualquer escola
+  Gratuita · sem cadastro · dados apenas neste aparelho · aberta a qualquer escola<br>
+  <span style="opacity:.7">Versão de 25/09/2026 · leitura 4</span>
 </div>
 
 </div>
@@ -2017,8 +2018,33 @@ function homografia(src,dst){
   h.push(1);
   return h;
 }
+/* Plano B quando a homografia sai degenerada.
+   Numa digitalização não existe perspectiva — o vidro e o papel estão
+   paralelos. O que existe é giro, deslocamento e um pouco de estiramento,
+   que uma transformação afim descreve inteira. Então, em vez de desistir,
+   ajusta-se a afim que melhor encaixa os quatro marcadores. */
+function afimDe4(src,dst){
+  var Sx=0,Sy=0,Sxx=0,Syy=0,Sxy=0,n=src.length;
+  for(var i=0;i<n;i++){
+    Sx+=src[i].x;Sy+=src[i].y;
+    Sxx+=src[i].x*src[i].x;Syy+=src[i].y*src[i].y;Sxy+=src[i].x*src[i].y;
+  }
+  var N=[[Sxx,Sxy,Sx],[Sxy,Syy,Sy],[Sx,Sy,n]];
+  function coefs(sel){
+    var b=[0,0,0];
+    for(var i=0;i<n;i++){
+      var v=sel(dst[i]);
+      b[0]+=src[i].x*v;b[1]+=src[i].y*v;b[2]+=v;
+    }
+    return resolver(N.map(function(l){return l.slice();}),b.slice(),3);
+  }
+  var a=coefs(function(p){return p.x;}),c=coefs(function(p){return p.y;});
+  if(!a||!c)return null;
+  return [a[0],a[1],a[2],c[0],c[1],c[2],0,0,1];
+}
 function aplicarH(h,x,y){
   var d=h[6]*x+h[7]*y+h[8];
+  if(!d)return {x:0,y:0};
   return {x:(h[0]*x+h[1]*y+h[2])/d,y:(h[3]*x+h[4]*y+h[5])/d};
 }
 
@@ -2075,8 +2101,10 @@ function lerFoto(cv){
   var blobs=componentes(bin,im.w,im.h);
   var M=acharMarcadores(blobs,ref);
   if(!M)return {erro:"Não encontrei os quatro cantos pretos. Fotografe de cima, com o gabarito inteiro no quadro e boa luz.",blobs:blobs,im:im};
-  var H=homografia([ref.marcas.tl,ref.marcas.tr,ref.marcas.br,ref.marcas.bl],[M.tl,M.tr,M.br,M.bl]);
-  if(!H)return {erro:"A perspectiva da foto ficou extrema demais. Tente fotografar mais de frente.",blobs:blobs,im:im};
+  var origem=[ref.marcas.tl,ref.marcas.tr,ref.marcas.br,ref.marcas.bl];
+  var destino=[M.tl,M.tr,M.br,M.bl];
+  var H=homografia(origem,destino)||afimDe4(origem,destino);
+  if(!H)return {erro:"Não consegui encaixar esta folha. Confira se o gabarito saiu inteiro na digitalização, com os quatro quadrados pretos dentro da página.",blobs:blobs,im:im};
 
   function escalaEm(p,rRef){
     var a=aplicarH(H,p.x,p.y),b2=aplicarH(H,p.x+rRef,p.y);
@@ -2092,43 +2120,55 @@ function lerFoto(cv){
      tudo em branco. Os 60 círculos impressos são pontos de referência muito
      melhores que quatro cantos: procura-se o pequeno ajuste (deslocamento e
      escala, em coordenadas do modelo) que faz o traço dos círculos coincidir. */
-  var ajX=0,ajY=0,ajSX=1,ajSY=1;
-  (function(){
+  function refinarGrade(comGiro,ini){
+    var ajX=ini?ini.x:0,ajY=ini?ini.y:0,ajSX=ini?ini.sx:1,ajSY=ini?ini.sy:1,ajAng=ini?ini.ang:0;
     var bs=ref.bolhas;
-    if(bs.length<8)return;
+    if(bs.length<8)return {x:0,y:0,sx:1,sy:1,ang:0,fn:function(p){return p;}};
     var cxT=0,cyT=0;
     bs.forEach(function(b){cxT+=b.x/bs.length;cyT+=b.y/bs.length;});
     var rT=bs[0].r,passoA=Math.max(2,Math.round(bs.length/24));
     var rImg=escalaEm(bs[0],bs[0].r);
-    function nota(dx,dy,sx,sy){
+    function mover(p,dx,dy,sx,sy,ang){
+      var ux=(p.x-cxT)*sx,uy=(p.y-cyT)*sy;
+      var co=Math.cos(ang),si=Math.sin(ang);
+      return {x:cxT+ux*co-uy*si+dx, y:cyT+ux*si+uy*co+dy};
+    }
+    function nota(dx,dy,sx,sy,ang){
       var s=0;
       for(var i=0;i<bs.length;i+=passoA){
-        var b=bs[i];
-        var p=aplicarH(H,cxT+(b.x-cxT)*sx+dx,cyT+(b.y-cyT)*sy+dy);
+        var q=mover(bs[i],dx,dy,sx,sy,ang);
+        var p=aplicarH(H,q.x,q.y);
         s+=mediaAnel(im,p.x,p.y,rImg*1.3,rImg*1.7)
           -mediaAnel(im,p.x,p.y,rImg*0.82,rImg*1.12);
       }
       return s;
     }
-    var melhor=nota(0,0,1,1);
+    var melhor=nota(ajX,ajY,ajSX,ajSY,ajAng);
+    /* o giro entra porque a digitalizadora tem dois rolos e o gabarito é fino:
+       um rolo agarra menos, o papel gira durante a passagem e a folha sai
+       torta — o que sobra depois dos quatro marcadores é justamente um
+       resíduo de giro */
     var faixas=[[0,rT*0.16],[1,rT*0.16],[2,0.008],[3,0.008]];
+    if(comGiro)faixas.push([4,0.0035]);
     for(var rodada=0;rodada<3;rodada++){
       for(var f=0;f<faixas.length;f++){
-        var qual=faixas[f][0],amp=faixas[f][1],base=[ajX,ajY,ajSX,ajSY];
+        var qual=faixas[f][0],amp=faixas[f][1],base=[ajX,ajY,ajSX,ajSY,ajAng];
         for(var k=-3;k<=3;k++){
           if(!k)continue;
           var v=base.slice();v[qual]=base[qual]+k*amp;
-          var n=nota(v[0],v[1],v[2],v[3]);
-          if(n>melhor){melhor=n;ajX=v[0];ajY=v[1];ajSX=v[2];ajSY=v[3];}
+          var n=nota(v[0],v[1],v[2],v[3],v[4]);
+          if(n>melhor){melhor=n;ajX=v[0];ajY=v[1];ajSX=v[2];ajSY=v[3];ajAng=v[4];}
         }
       }
       faixas=faixas.map(function(f2){return [f2[0],f2[1]*0.5];});
     }
-    var cT={x:cxT,y:cyT};
-    ajustar=function(p){
-      return {x:cT.x+(p.x-cT.x)*ajSX+ajX, y:cT.y+(p.y-cT.y)*ajSY+ajY};
-    };
-  })();
+    return {x:ajX,y:ajY,sx:ajSX,sy:ajSY,ang:ajAng,
+            fn:function(p){return mover(p,ajX,ajY,ajSX,ajSY,ajAng);}};
+  }
+  /* primeiro sem giro — o caso comum, e o mais estável */
+  var gA=refinarGrade(false,null);
+  var ajX=gA.x,ajY=gA.y,ajSX=gA.sx,ajSY=gA.sy,ajAng=0;
+  ajustar=gA.fn;
 
   /* Referências globais de tinta e de papel.
      Os marcadores dos cantos são preto sólido; o entorno das bolhas é papel.
@@ -2157,9 +2197,10 @@ function lerFoto(cv){
   if(papel-tinta<30){papel=255;tinta=0;}
 
   // código do aluno
-  var bitsLidos=[],detCod=[],duvidoso=false,codigo=null,codigoOk=false;
-  if(ref.codigo.length===8){
-    var cs=ref.codigo.map(function(c){return projetar(c);});
+  var bitsLidos=[],detCod=[],duvidoso=false,codigo=null,codigoOk=false,margemTira=0;
+  function lerTira(fnAj){
+    var bits=[],det=[],duv=false,margem=0;
+    var cs=ref.codigo.map(function(c){var q=fnAj(c);return aplicarH(H,q.x,q.y);});
     var rc=escalaEm(ref.codigo[0],ref.codigo[0].r);
     var meio=(papel+tinta)/2,faixaC=Math.max(1,papel-tinta);
     var rMio=Math.max(1.5,rc*0.42),rVao=Math.max(1.5,rc*0.3),rPt=Math.max(1,rc*0.16);
@@ -2202,27 +2243,62 @@ function lerFoto(cv){
     /* além do deslocamento, um pequeno erro de escala: um marcador borrado ou
        cortado move o centro detectado e a tira inteira estica um pouco */
     var ESCALAS=[0.98,1,1.02];
-    var melhorS=-1,ox=0,oy=0,oe=1,passo=Math.max(1,rc*0.15),lim=rc*1.2;
-    for(var ei=0;ei<ESCALAS.length;ei++)
-      for(var dy=-lim;dy<=lim;dy+=passo)for(var dx=-lim;dx<=lim;dx+=passo){
-        var sc=pontuarTira(dx,dy,ESCALAS[ei]);
-        if(sc>melhorS){melhorS=sc;ox=dx;oy=dy;oe=ESCALAS[ei];}
-      }
+    var melhorS=-1,ox=0,oy=0,oe=1;
+    function varrer(cx0,cy0,lim,passo){
+      for(var ei=0;ei<ESCALAS.length;ei++)
+        for(var dy=cy0-lim;dy<=cy0+lim;dy+=passo)
+          for(var dx=cx0-lim;dx<=cx0+lim;dx+=passo){
+            var sc=pontuarTira(dx,dy,ESCALAS[ei]);
+            if(sc>melhorS){melhorS=sc;ox=dx;oy=dy;oe=ESCALAS[ei];}
+          }
+    }
+    /* busca curta de propósito: depois do reencaixe da grade o erro que sobra
+       na tira é pequeno, e uma busca larga deixa a tira escorregar para o
+       encaixe vizinho */
+    varrer(0,0,rc*1.2,Math.max(1,rc*0.15));
+    /* Margem contra o encaixe vizinho: a tira é periódica, então existe sempre
+       um segundo encaixe deslocado de uma casinha. Se o melhor não ganhar do
+       vizinho com folga, o código não é confiável — melhor perguntar ao
+       professor do que atribuir a folha ao aluno errado. */
+    var pvx=cs[1].x-cs[0].x, pvy=cs[1].y-cs[0].y;
+    var rival=Math.max(pontuarTira(ox+pvx,oy+pvy,oe),pontuarTira(ox-pvx,oy-pvy,oe));
+    margem=melhorS-rival;
     var faixa=Math.max(1,papel-tinta);
     cs.forEach(function(p,ic){
       var q=posEm(ic,ox,oy,oe);
       var dentro=mediaDisco(im,q.x,q.y,rMio);
       var rel=(papel-dentro)/faixa;
-      if(rel>0.30&&rel<0.70)duvidoso=true;
-      bitsLidos.push(rel>0.5?1:0);
-      detCod.push({x:q.x,y:q.y,r:rc,esc:Math.max(0,Math.min(1,rel))});
+      if(rel>0.30&&rel<0.70)duv=true;
+      bits.push(rel>0.5?1:0);
+      det.push({x:q.x,y:q.y,r:rc,esc:Math.max(0,Math.min(1,rel))});
     });
+    return {bits:bits,det:det,duv:duv,margem:margem};
+  }
+  if(ref.codigo.length===8){
+    var tira=lerTira(ajustar);
+    /* A digitalizadora puxa o gabarito com dois rolos e às vezes um deles
+       agarra menos: o papel gira durante a passagem. Se a tira não encaixou
+       com folga, tenta-se de novo com a grade reencaixada também em giro, e
+       fica a leitura mais segura das duas. Só como segunda chance: aplicado
+       sempre, o giro desestabiliza folhas que já estavam boas. */
+    if(tira.margem<0.7){
+      var gB=refinarGrade(true,gA);
+      var tira2=lerTira(gB.fn);
+      if(tira2.margem>tira.margem){tira=tira2;ajAng=gB.ang;}
+    }
+    bitsLidos=tira.bits;detCod=tira.det;duvidoso=tira.duv;margemTira=tira.margem;
+    if(margemTira<0.25)duvidoso=true;
     if(!duvidoso){
       var uns=0;
       for(var i=0;i<7;i++)if(bitsLidos[i])uns++;
       if(uns%2===bitsLidos[7]){
         codigo=bitsLidos.slice(0,7).reduce(function(v,x){return v*2+x;},0);
         codigoOk=true;
+        /* "todas as casinhas vazias" é também o que se lê quando a tira não
+           foi encontrada. Um avulso de verdade encaixa com muita folga; sem
+           ela, é mais honesto dizer que não deu para ler do que chamar de
+           avulso uma folha que tem dono */
+        if(codigo===0&&margemTira<0.9){codigo=null;codigoOk=false;}
       }
     }
   }
@@ -2261,7 +2337,7 @@ function lerFoto(cv){
   }
   return {respostas:respostas,duvidas:duvidas,codigo:codigo,codigoOk:codigoOk,
           im:im,marcas:M,detalhe:detalhe,detCod:detCod,cv:cv,
-          ajuste:{x:ajX,y:ajY,sx:ajSX,sy:ajSY},
+          ajuste:{x:ajX,y:ajY,sx:ajSX,sy:ajSY,ang:ajAng},margem:margemTira,
           recorteNome:recortarCampo(im,H,ajustar,ref.campoNome,420)};
 }
 
