@@ -537,6 +537,9 @@ details.help code{font-family:"IBM Plex Mono",monospace; font-size:11.5px; backg
         if(cur && cur.parts && cur.parts.length) cur.open = false;
         continue;
       }
+      if(/^\s*[-–—_=*]{3,}\s*$/.test(L)){ if(cur) cur.open=false; continue; }
+      if(/^\s*(gabarito|tempo estimado|resposta)\s*:/i.test(L)){ if(cur) cur.open=false; continue; }
+      if((m = L.match(/^\s*QUEST[ÃA]O\s+(\d{1,3})\s*[:.\)\-–]?\s*(.*)$/i))){ openQ(m[1], m[2].trim()); cur.open = !!m[2].trim(); if(!m[2].trim()) cur.parts=[]; continue; }
       if((m = L.match(RE_SEC))){ flush(); blocks.push({type:"sec", t:m[1].trim()}); continue; }
       if(RE_COL.test(L)){ flush(); blocks.push({type:"col"}); continue; }
       if(RE_BRK.test(L)){ flush(); blocks.push({type:"brk"}); continue; }
@@ -565,7 +568,8 @@ details.help code{font-family:"IBM Plex Mono",monospace; font-size:11.5px; backg
         addPart({k:"table", rows:rows}); cur.open=false; continue;
       }
       // texto solto
-      if(cur && cur.open!==false && cur.parts.length && cur.parts[cur.parts.length-1].k==="p" && !cur.alts.length){
+      if(/^\s*\(\s*[0-9A-Za-z]*\s*\)\s+\S/.test(L) && cur){ cur.open=false; }
+      if(cur && cur.open!==false && cur.parts.length && cur.parts[cur.parts.length-1].k==="p" && !(cur.alts && cur.alts.length)){
         cur.parts[cur.parts.length-1].t += " " + L.trim();
       } else {
         addPart({k:"p", t:L.trim()});
