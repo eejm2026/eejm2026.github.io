@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="author" content="PCPI Thiago Vareiro Valerio - EE Joaquim Murtinho">
-<meta name="description" content="Monta a prova pronta para impressão em A4, com cabeçalho padronizado da escola, uma ou duas colunas e ajuste automático do tamanho da letra.">
+<meta name="description" content="Monta a prova pronta para impressão em A4, com cabeçalho padronizado da escola, uma ou duas colunas e ajuste automático do tamanho da letra. Exporta em PDF e em Word.">
 <title>Montador de Provas</title>
 <style>html{color-scheme:light dark}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
 </head>
@@ -240,6 +240,7 @@ details.help code{font-family:"IBM Plex Mono",monospace; font-size:11.5px; backg
   <div class="actions">
     <button class="btn ghost" id="btnTheme" type="button">Tema</button>
     <button class="btn" id="btnFit" type="button">Ajustar às folhas</button>
+    <button class="btn" id="btnDocx" type="button">Baixar Word (.docx)</button>
     <button class="btn primary" id="btnPrint" type="button">Imprimir / PDF</button>
   </div>
 </div>
@@ -965,6 +966,7 @@ details.help code{font-family:"IBM Plex Mono",monospace; font-size:11.5px; backg
     render();
   });
 
+  $("btnDocx").addEventListener("click", function(){ exportDocx().catch(function(e){ alert("Não foi possível gerar o arquivo Word: "+e.message); }); });
   $("btnFit").addEventListener("click", autofit);
   $("btnPrint").addEventListener("click", function(){
     try{ window.print(); }
@@ -975,6 +977,237 @@ details.help code{font-family:"IBM Plex Mono",monospace; font-size:11.5px; backg
     var next = cur==="dark" ? "light" : (cur==="light" ? "dark" : "dark");
     document.documentElement.setAttribute("data-theme", next);
   });
+
+  /* ---------------- exportação .docx (sem bibliotecas) ---------------- */
+  var CRC_T = (function(){ var t = [], c, n, k; for(n=0;n<256;n++){ c=n; for(k=0;k<8;k++) c = c&1 ? (0xEDB88320 ^ (c>>>1)) : (c>>>1); t[n]=c>>>0; } return t; })();
+  function crc32(u8){ var c = 0xFFFFFFFF; for(var i=0;i<u8.length;i++) c = CRC_T[(c ^ u8[i]) & 0xFF] ^ (c>>>8); return (c ^ 0xFFFFFFFF)>>>0; }
+  function zipStore(files){
+    var enc = new TextEncoder(), parts = [], central = [], offset = 0;
+    function u16(n){ return [n&255,(n>>8)&255]; }
+    function u32(n){ return [n&255,(n>>8)&255,(n>>16)&255,(n>>>24)&255]; }
+    files.forEach(function(f){
+      var name = enc.encode(f.name), data = (typeof f.data === "string") ? enc.encode(f.data) : f.data, crc = crc32(data);
+      var lh = new Uint8Array([0x50,0x4B,3,4, 20,0, 0,8, 0,0, 0,0, 33,0].concat(u32(crc), u32(data.length), u32(data.length), u16(name.length), [0,0]));
+      parts.push(lh, name, data);
+      central.push({name:name, crc:crc, size:data.length, off:offset});
+      offset += lh.length + name.length + data.length;
+    });
+    var cdStart = offset;
+    central.forEach(function(c){
+      var h = new Uint8Array([0x50,0x4B,1,2, 20,0, 20,0, 0,8, 0,0, 0,0, 33,0].concat(u32(c.crc), u32(c.size), u32(c.size), u16(c.name.length), [0,0, 0,0, 0,0, 0,0], [0,0,0,0], u32(c.off)));
+      parts.push(h, c.name); offset += h.length + c.name.length;
+    });
+    var end = new Uint8Array([0x50,0x4B,5,6, 0,0, 0,0].concat(u16(central.length), u16(central.length), u32(offset-cdStart), u32(cdStart), [0,0]));
+    parts.push(end);
+    return new Blob(parts, {type:"application/vnd.openxmlformats-officedocument.wordprocessingml.document"});
+  }
+
+  function xe(s){ return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g,""); }
+  function tw(mm){ return Math.round(mm*56.6929); }
+  function emu(mm){ return Math.round(mm*36000); }
+  function firstFont(fam){ return String(fam).split(",")[0].replace(/["']/g,"").trim() || "Arial"; }
+
+  function dataToPart(src){
+    return new Promise(function(resolve){
+      var im = new Image();
+      im.onload = function(){
+        var m = /^data:image\/(png|jpeg|jpg);base64,(.*)$/i.exec(src), bytes, ext;
+        if(m){ ext = m[1].toLowerCase()==="png" ? "png" : "jpeg"; var bin = atob(m[2]); bytes = new Uint8Array(bin.length); for(var i=0;i<bin.length;i++) bytes[i]=bin.charCodeAt(i); }
+        else { var cv = document.createElement("canvas"); cv.width = im.naturalWidth; cv.height = im.naturalHeight; cv.getContext("2d").drawImage(im,0,0);
+               var b64 = cv.toDataURL("image/png").split(",")[1], bin2 = atob(b64); bytes = new Uint8Array(bin2.length); for(var j=0;j<bin2.length;j++) bytes[j]=bin2.charCodeAt(j); ext="png"; }
+        resolve({bytes:bytes, ext:ext, w:im.naturalWidth, h:im.naturalHeight});
+      };
+      im.onerror = function(){ resolve(null); };
+      im.src = src;
+    });
+  }
+
+  async function exportDocx(){
+    readUI();
+    var parsed = parse($("src").value);
+    if(!parsed.blocks.length){ alert("Cole as questões antes de baixar."); return; }
+    var blocks = parsed.blocks, font = firstFont(S.fam), SZ = Math.round(S.fsz*2);
+    var contentW = PAGE_W - 2*S.mx, colW = S.cols===2 ? (contentW - S.colgap)/2 : contentW;
+
+    // imagens
+    var media = [], relXml = [], did = 100;
+    async function addImage(src){
+      if(!src) return null;
+      var part = await dataToPart(src); if(!part) return null;
+      var n = media.length + 1, rid = "rIdImg" + n, name = "image" + n + "." + part.ext;
+      media.push({name:"word/media/"+name, data:part.bytes});
+      relXml.push('<Relationship Id="'+rid+'" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/'+name+'"/>');
+      return {rid:rid, ar:part.w/part.h, name:name};
+    }
+    function drawing(img, wmm, hmm){
+      did++;
+      return '<w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="'+emu(wmm)+'" cy="'+emu(hmm)+'"/><wp:docPr id="'+did+'" name="Imagem '+did+'"/>'+
+        '<wp:cNvGraphicFramePr><a:graphicFrameLocks noChangeAspect="1"/></wp:cNvGraphicFramePr><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic>'+
+        '<pic:nvPicPr><pic:cNvPr id="'+did+'" name="'+img.name+'"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="'+img.rid+'"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill>'+
+        '<pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="'+emu(wmm)+'" cy="'+emu(hmm)+'"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r>';
+    }
+
+    // primitivas
+    function R(t, o){ o = o||{};
+      var pr = (o.font?'<w:rFonts w:ascii="'+o.font+'" w:hAnsi="'+o.font+'" w:cs="'+o.font+'"/>':"")+(o.b?"<w:b/>":"")+(o.i?"<w:i/>":"")+(o.caps?"<w:caps/>":"")+
+               (o.color?'<w:color w:val="'+o.color+'"/>':"")+(o.sz?'<w:sz w:val="'+o.sz+'"/><w:szCs w:val="'+o.sz+'"/>':"");
+      return '<w:r>'+(pr?'<w:rPr>'+pr+'</w:rPr>':"")+'<w:t xml:space="preserve">'+xe(t)+'</w:t></w:r>';
+    }
+    function TAB(o){ return '<w:r>'+(o&&o.sz?'<w:rPr><w:sz w:val="'+o.sz+'"/></w:rPr>':"")+'<w:tab/></w:r>'; }
+    function P(runs, o){ o = o||{};
+      var pr = (o.keepNext?"<w:keepNext/>":"")+(o.keepLines?"<w:keepLines/>":"")+(o.pageBreakBefore?"<w:pageBreakBefore/>":"")+
+        (o.bdrBottom?'<w:pBdr><w:bottom w:val="single" w:sz="'+o.bdrBottom+'" w:space="1" w:color="'+(o.bdrColor||"000000")+'"/><w:between w:val="single" w:sz="'+o.bdrBottom+'" w:space="1" w:color="'+(o.bdrColor||"000000")+'"/></w:pBdr>':"")+
+        (o.tabs?'<w:tabs>'+o.tabs.map(function(t){ return '<w:tab w:val="'+t.val+'"'+(t.leader?' w:leader="'+t.leader+'"':"")+' w:pos="'+t.pos+'"/>'; }).join("")+'</w:tabs>':"")+
+        '<w:spacing w:before="'+(o.before||0)+'" w:after="'+(o.after||0)+'"'+(o.line?' w:line="'+o.line+'" w:lineRule="'+(o.lineRule||"auto")+'"':"")+'/>'+
+        (o.ind?'<w:ind w:left="'+(o.ind.left||0)+'"'+(o.ind.hanging?' w:hanging="'+o.ind.hanging+'"':"")+'/>':"")+
+        (o.jc?'<w:jc w:val="'+o.jc+'"/>':"")+(o.sect||"");
+      return '<w:p>'+(pr?'<w:pPr>'+pr+'</w:pPr>':"")+(runs||"")+'</w:p>';
+    }
+    var jcBody = S.align==="justify" ? "both" : "left";
+
+    // ---------- cabeçalho (tabela) ----------
+    var T = S.nota ? contentW - 20 : contentW;
+    var hs = 19; // 9,5 pt
+    var imgL = (S.showL ? await addImage(IMAGES.logoL || EEJMLOGO) : null);
+    var imgR = (S.showlogos ? await addImage(IMAGES.logo || SEDLOGO) : null);
+    function logoPara(img, hmm, jc){
+      if(!img) return P("");
+      var h = hmm, w = h*img.ar; if(w > 31){ w = 31; h = w/img.ar; }
+      return P(drawing(img, w, h), {jc:jc});
+    }
+    function lineField(label, val, wmm){
+      var pos = tw(wmm) - 200;
+      if(val && val.trim()) return P(R(label+" ",{b:false,sz:hs})+R(val,{sz:hs}), {});
+      return P(R(label,{sz:hs})+TAB({sz:hs}), {tabs:[{val:"right",leader:"underscore",pos:pos}]});
+    }
+    var nomeEsc = R(S.escola||"",{font:"Arial Narrow",sz:34,color:"29389A",caps:true});
+    var rows = [];
+    rows.push([{w:34, xml:logoPara(imgL,13,"left")},{w:T-68, xml:P(nomeEsc,{jc:"center"})+P(R(S.endereco||"",{b:true,sz:15}),{jc:"center",before:20})},{w:34, xml:logoPara(imgR,11,"right")}]);
+    if(S.h3 && S.h3.trim()) rows.push([{w:T, xml:P(R(S.h3,{b:true,sz:21}),{jc:"center"}), top:true}]);
+    rows.push([{w:T-48, xml:lineField("Estudante:","",T-48), top:true, vr:true},{w:18, xml:lineField("Nº:","",18), top:true, vr:true},{w:30, xml:lineField("Turma:",S.turma,30), top:true}]);
+    rows.push([{w:42, xml:lineField("Componente:",S.comp,42), top:true, vr:true},{w:T-42-24-38, xml:lineField("Professor(a):",S.prof,T-42-24-38), top:true, vr:true},{w:24, xml:lineField("Valor:",S.valor,24), top:true, vr:true},{w:38, xml:lineField("Data:","",38), top:true}]);
+    var bset = {0:true}; rows.forEach(function(r){ var x=0; r.forEach(function(c){ x += c.w; bset[Math.round(x*100)/100] = true; }); });
+    var bounds = Object.keys(bset).map(parseFloat).sort(function(a,b){return a-b;});
+    var grid = []; for(var bi=1; bi<bounds.length; bi++) grid.push(bounds[bi]-bounds[bi-1]);
+    if(S.nota) grid.push(20);
+    function spanOf(start, w){ var a = Math.round(start*100)/100, b = Math.round((start+w)*100)/100, n = 0;
+      for(var k=1;k<bounds.length;k++){ if(bounds[k] > a+0.001 && bounds[k] <= b+0.001) n++; } return Math.max(1,n); }
+    function tc(w, span, paras, o){ o = o||{};
+      var b = ""; if(o.top) b += '<w:top w:val="single" w:sz="6" w:space="0" w:color="000000"/>';
+      if(o.vl) b += '<w:left w:val="single" w:sz="6" w:space="0" w:color="000000"/>'; if(o.vr) b += '<w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/>';
+      return '<w:tc><w:tcPr><w:tcW w:w="'+tw(w)+'" w:type="dxa"/>'+(span>1?'<w:gridSpan w:val="'+span+'"/>':"")+(o.vm?'<w:vMerge'+(o.vm==="restart"?' w:val="restart"':"")+'/>':"")+
+        (b?'<w:tcBorders>'+b+'</w:tcBorders>':"")+'<w:vAlign w:val="'+(o.va||"center")+'"/></w:tcPr>'+paras+'</w:tc>'; }
+    var trs = rows.map(function(r, ri){
+      var x = 0, cells = r.map(function(c){ var s = spanOf(x, c.w); x += c.w; return tc(c.w, s, c.xml, {top:c.top, vr:c.vr}); }).join("");
+      if(S.nota) cells += tc(20, 1, ri===0 ? P(R("Nota",{sz:hs}),{jc:"center"}) : P(""), {vm: ri===0?"restart":"continue", vl:true, va:"top"});
+      return '<w:tr><w:trPr><w:cantSplit/></w:trPr>'+cells+'</w:tr>';
+    });
+    var allSpan = grid.length;
+    if(S.conteudo && S.conteudo.trim()) trs.push('<w:tr><w:trPr><w:cantSplit/></w:trPr>'+tc(contentW, allSpan, P(R("Conteúdo / habilidades: ",{b:true,sz:hs})+R(S.conteudo,{sz:hs})), {top:true})+'</w:tr>');
+    if(S.orient && S.orienttxt && S.orienttxt.trim()) trs.push('<w:tr><w:trPr><w:cantSplit/></w:trPr>'+tc(contentW, allSpan, P(R("Orientações: ",{b:true,sz:17})+R(S.orienttxt.replace(/\n/g," "),{sz:17}),{jc:"both"}), {top:true})+'</w:tr>');
+    var headTbl = '<w:tbl><w:tblPr><w:tblW w:w="'+tw(contentW)+'" w:type="dxa"/><w:tblBorders><w:top w:val="single" w:sz="8" w:space="0" w:color="000000"/><w:left w:val="single" w:sz="8" w:space="0" w:color="000000"/><w:bottom w:val="single" w:sz="8" w:space="0" w:color="000000"/><w:right w:val="single" w:sz="8" w:space="0" w:color="000000"/></w:tblBorders><w:tblLayout w:type="fixed"/><w:tblCellMar><w:top w:w="30" w:type="dxa"/><w:left w:w="90" w:type="dxa"/><w:bottom w:w="30" w:type="dxa"/><w:right w:w="90" w:type="dxa"/></w:tblCellMar></w:tblPr>'+
+      '<w:tblGrid>'+grid.map(function(g){ return '<w:gridCol w:w="'+tw(g)+'"/>'; }).join("")+'</w:tblGrid>'+trs.join("")+'</w:tbl>';
+
+    // ---------- corpo ----------
+    var body = [];
+    var gapTw = tw(S.gap), lineVal = Math.round(S.lh*240);
+    var imgSizes = {};
+    for(var k in IMAGES){ if(/^\d+$/.test(k)) imgSizes[k] = await addImage(IMAGES[k]); }
+    function partXml(p, ctx){
+      if(p.k==="p") return P(R(p.t,{}), {jc:jcBody, line:lineVal, keepNext:ctx.keepNext, keepLines:true});
+      if(p.k==="img"){
+        var im = imgSizes[p.idx], wmm = colW*p.w/100;
+        if(im){ var hmm = wmm/im.ar; if(hmm > 150){ hmm = 150; wmm = hmm*im.ar; } return P(drawing(im, wmm, hmm), {jc:"center", before:60, after:60, keepNext:ctx.keepNext}); }
+        return '<w:tbl><w:tblPr><w:tblW w:w="'+tw(wmm)+'" w:type="dxa"/><w:jc w:val="center"/><w:tblBorders><w:top w:val="dashed" w:sz="4" w:space="0" w:color="777777"/><w:left w:val="dashed" w:sz="4" w:space="0" w:color="777777"/><w:bottom w:val="dashed" w:sz="4" w:space="0" w:color="777777"/><w:right w:val="dashed" w:sz="4" w:space="0" w:color="777777"/></w:tblBorders><w:tblLayout w:type="fixed"/></w:tblPr><w:tblGrid><w:gridCol w:w="'+tw(wmm)+'"/></w:tblGrid><w:tr><w:trPr><w:trHeight w:val="'+tw(30)+'" w:hRule="atLeast"/></w:trPr><w:tc><w:tcPr><w:tcW w:w="'+tw(wmm)+'" w:type="dxa"/><w:vAlign w:val="center"/></w:tcPr>'+P(R("[Imagem "+p.idx+" — inserir aqui]",{color:"666666"}),{jc:"center"})+'</w:tc></w:tr></w:tbl>'+P("",{line:60,lineRule:"exact"});
+      }
+      if(p.k==="lines"){ var s=""; for(var i=0;i<p.n;i++) s += P("",{line:Math.round(SZ*10*1.95),lineRule:"exact",bdrBottom:4,bdrColor:"555555"}); return s; }
+      if(p.k==="space") return P("",{line:tw(p.mm),lineRule:"exact"});
+      if(p.k==="table"){
+        var ncol = Math.max.apply(null, p.rows.map(function(r){ return r.cells.length; }));
+        var maxLen = 4; p.rows.forEach(function(r){ r.cells.forEach(function(c){ maxLen = Math.max(maxLen, c.length + (p.rows[0].head ? 2 : 0)); }); });
+        var cellTw = Math.min(Math.round(tw(colW)/ncol), Math.round(maxLen * (S.fsz) * 0.55 * 20 + 380));
+        var trx = p.rows.map(function(r, ri){
+          var head = p.rows[0].head && ri===0;
+          return '<w:tr><w:trPr><w:cantSplit/></w:trPr>'+r.cells.map(function(c){ return '<w:tc><w:tcPr><w:tcW w:w="'+Math.round(tw(colW*0.8)/ncol)+'" w:type="dxa"/></w:tcPr>'+P(R(c,{b:head}),{jc:"center",keepNext:ctx.keepNext || ri<p.rows.length-1}) +'</w:tc>'; }).join("")+'</w:tr>';
+        }).join("");
+        var gw = cellTw, gcs=""; for(var g=0;g<ncol;g++) gcs += '<w:gridCol w:w="'+gw+'"/>';
+        var bd = ["top","left","bottom","right","insideH","insideV"].map(function(s){ return '<w:'+s+' w:val="single" w:sz="4" w:space="0" w:color="000000"/>'; }).join("");
+        return '<w:tbl><w:tblPr><w:tblW w:w="'+gw*ncol+'" w:type="dxa"/><w:jc w:val="center"/><w:tblBorders>'+bd+'</w:tblBorders><w:tblLayout w:type="fixed"/><w:tblCellMar><w:left w:w="80" w:type="dxa"/><w:right w:w="80" w:type="dxa"/></w:tblCellMar></w:tblPr><w:tblGrid>'+gcs+'</w:tblGrid>'+trx+'</w:tbl>'+P("",{line:80,lineRule:"exact"});
+      }
+      return "";
+    }
+    var first = true;
+    blocks.forEach(function(b){
+      if(b.type==="col"){ body.push('<w:p><w:r><w:br w:type="column"/></w:r></w:p>'); first = true; return; }
+      if(b.type==="brk"){ body.push('<w:p><w:r><w:br w:type="page"/></w:r></w:p>'); first = true; return; }
+      var before = first ? 0 : gapTw; first = false;
+      if(b.type==="sec"){ body.push(P(R(b.t,{b:true,caps:true}), {jc:"center", before:before, after:80, keepNext:true})); return; }
+      if(b.type==="base"){
+        b.parts.forEach(function(p, i){ var x = partXml(p,{keepNext:S.keep}); body.push(i===0 && p.k==="p" ? x.replace('<w:spacing w:before="0"','<w:spacing w:before="'+before+'"') : x); });
+        return;
+      }
+      if(b.type==="q"){
+        var num = S.renum ? b.shown : b.num, hasAlts = b.alts.length>0;
+        if(!b.parts.length || b.parts[0].k!=="p") body.push(P(R(num+".",{b:true}),{before:before, keepNext:true}));
+        b.parts.forEach(function(p, i){
+          var kn = hasAlts || i < b.parts.length-1;
+          if(i===0 && p.k==="p"){ body.push(P(R(num+".",{b:true})+R(" "+p.t,{}), {jc:jcBody, line:lineVal, before:before, keepNext:kn, keepLines:true})); }
+          else body.push(partXml(p,{keepNext:kn}));
+        });
+        if(hasAlts){
+          var cls = altClass(b.alts), A = b.alts, ind = {left:397, hanging:397};
+          if(cls==="inline"){
+            body.push(P(A.map(function(a, i){ return (i?R("    "):"")+R(a.letter+") ",{b:false})+R(a.t,{}); }).join(""), {line:lineVal, keepLines:true}));
+          } else if(cls==="c2"){
+            var half = tw(colW/2);
+            for(var i=0;i<A.length;i+=2){
+              body.push(P(R(A[i].letter+") "+A[i].t,{})+(A[i+1]?TAB()+R(A[i+1].letter+") "+A[i+1].t,{}):""), {tabs:[{val:"left",pos:half}], line:lineVal, keepNext:i+2<A.length, keepLines:true}));
+            }
+          } else {
+            A.forEach(function(a, i){ body.push(P(R(a.letter+")")+TAB()+R(a.t,{}), {ind:ind, tabs:[{val:"left",pos:397}], line:lineVal, keepNext:i<A.length-1, keepLines:true})); });
+          }
+        }
+      }
+    });
+    if(S.gab){
+      var gab = [];
+      blocks.forEach(function(b){ if(b.type==="q" && b.alts.length){ var ok = b.alts.filter(function(a){return a.ok;})[0]; gab.push((S.renum?b.shown:b.num)+" · "+(ok?ok.letter:"—")); } });
+      body.push(P(R("Gabarito — uso exclusivo do professor",{b:true,caps:true}),{jc:"center",pageBreakBefore:true,after:120}));
+      body.push(P(R(gab.join("      "),{}),{line:lineVal+120}));
+    }
+
+    // ---------- seções ----------
+    var botMm = S.mb + 7, footDist = Math.max(S.mb-2, 4);
+    var fref = '<w:footerReference w:type="default" r:id="rIdFtr"/>';
+    var pg = '<w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="'+tw(S.mt)+'" w:right="'+tw(S.mx)+'" w:bottom="'+tw(botMm)+'" w:left="'+tw(S.mx)+'" w:header="'+tw(5)+'" w:footer="'+tw(footDist)+'" w:gutter="0"/>';
+    var sect1 = '<w:sectPr>'+fref+pg+'<w:cols w:space="720"/></w:sectPr>';
+    var sect2 = '<w:sectPr>'+fref+'<w:type w:val="continuous"/>'+pg+'<w:cols w:num="2" w:space="'+tw(S.colgap)+'"'+(S.sep?' w:sep="1"':"")+'/></w:sectPr>';
+    var xml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><w:body>';
+    xml += headTbl;
+    if(S.cols===2){
+      xml += P("",{line:60,lineRule:"exact",after:tw(3.5),sect:sect1}) + body.join("") + sect2;
+    } else {
+      xml += P("",{line:60,lineRule:"exact",after:tw(3.5)}) + body.join("") + sect1;
+    }
+    xml += '</w:body></w:document>';
+
+    var page = S.foot ? R("Página ",{sz:16})+'<w:fldSimple w:instr=" PAGE "><w:r><w:rPr><w:sz w:val="16"/></w:rPr><w:t>1</w:t></w:r></w:fldSimple>'+R(" de ",{sz:16})+'<w:fldSimple w:instr=" NUMPAGES "><w:r><w:rPr><w:sz w:val="16"/></w:rPr><w:t>1</w:t></w:r></w:fldSimple>' : "";
+    var rt = (S.rodape||"").trim();
+    var ftr = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:ftr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'+
+      P(R(S.escola||"",{sz:16})+TAB({sz:16})+(rt?R(rt,{sz:16}):"")+(rt&&S.foot?R("  ·  ",{sz:16}):"")+page, {tabs:[{val:"right",pos:tw(contentW)}], bdrBottom:0}).replace('<w:pBdr><w:bottom w:val="single" w:sz="0" w:space="1" w:color="000000"/></w:pBdr>','<w:pBdr><w:top w:val="single" w:sz="4" w:space="2" w:color="999999"/></w:pBdr>')+'</w:ftr>';
+    var styles = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="'+font+'" w:hAnsi="'+font+'" w:cs="'+font+'" w:eastAsia="'+font+'"/><w:sz w:val="'+SZ+'"/><w:szCs w:val="'+SZ+'"/><w:lang w:val="pt-BR"/></w:rPr></w:rPrDefault><w:pPrDefault><w:pPr><w:spacing w:after="0" w:line="'+lineVal+'" w:lineRule="auto"/></w:pPr></w:pPrDefault></w:docDefaults><w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/><w:qFormat/></w:style></w:styles>';
+    var ct = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Default Extension="png" ContentType="image/png"/><Default Extension="jpeg" ContentType="image/jpeg"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/><Override PartName="/word/footer1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml"/></Types>';
+    var rels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>';
+    var docRels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rIdSt" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/><Relationship Id="rIdFtr" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer" Target="footer1.xml"/>'+relXml.join("")+'</Relationships>';
+
+    var files = [{name:"[Content_Types].xml",data:ct},{name:"_rels/.rels",data:rels},{name:"word/document.xml",data:xml},{name:"word/styles.xml",data:styles},{name:"word/footer1.xml",data:ftr},{name:"word/_rels/document.xml.rels",data:docRels}].concat(media);
+    var blob = zipStore(files);
+    var nome = ("prova-" + ((S.comp||"").trim() || "eejm")).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"") + ".docx";
+    var url = URL.createObjectURL(blob), a = document.createElement("a");
+    a.href = url; a.download = nome; document.body.appendChild(a); a.click();
+    setTimeout(function(){ document.body.removeChild(a); URL.revokeObjectURL(url); }, 1500);
+  }
+  window.__exportDocx = exportDocx;
 
   /* ---------------- início ---------------- */
   var saved = load();
