@@ -278,6 +278,11 @@ label.f textarea{resize:vertical}
 .freset{border:0; background:none; color:var(--accent); cursor:pointer; font-size:11.5px; padding:2px 0 0; text-decoration:underline; font-family:inherit}
 .chip .freset{padding:0 0 0 6px}
 .formpreview .empty{max-width:none}
+p.note{margin:10px 0 0; font-size:12px; line-height:1.5; color:var(--ink-2); background:var(--accent-soft); border-radius:6px; padding:8px 10px}
+p.note code{font-family:"IBM Plex Mono",monospace; font-size:11.5px; background:var(--surface); padding:1px 4px; border-radius:3px}
+.fid .fidl{margin:6px 0 0; padding-left:20px; font-size:13.5px; line-height:1.6}
+.fid .fbn{font-size:12px; color:var(--ink-3); border:1px dashed var(--rule); border-radius:5px; padding:6px 8px; margin-bottom:4px}
+.fnog-inline{color:var(--bad)}
 @media print{ #modeScreen,#formpreview{display:none!important} }
 </style>
 
@@ -324,6 +329,8 @@ label.f textarea{resize:vertical}
       <h2>Questões</h2>
       <textarea id="src" spellcheck="false"></textarea>
       <p class="hintline">Cole as questões já prontas. O conteúdo fica salvo neste navegador.</p>
+      <p class="note only-print"><b>Imagem na prova impressa:</b> escreva <code>[IMAGEM:55]</code> no lugar da figura. O número é a largura que ela ocupa, em % da coluna. Ao digitar o marcador, aparece logo abaixo da caixa o campo para carregar a imagem.</p>
+      <p class="note only-form"><b>Imagem no formulário:</b> o marcador <code>[IMAGEM]</code> não vale aqui. Depois de criar o formulário, abra-o no editor do Google Forms e insira a figura na própria pergunta.</p>
       <details class="help only-print">
         <summary>Como escrever (marcadores)</summary>
         <table>
@@ -332,7 +339,7 @@ label.f textarea{resize:vertical}
           <tr><td><code>*B)</code></td><td>Marca a correta. O asterisco não sai na prova, só no gabarito.</td></tr>
           <tr><td><code>&gt;</code></td><td>Texto-base, não numerado. Fica junto da questão seguinte.</td></tr>
           <tr><td><code>##</code></td><td>Título de parte: <code>## Parte I — Física</code></td></tr>
-          <tr><td><code>[IMAGEM]</code></td><td>Reserva a imagem. Use <code>[IMAGEM:60]</code> para 60% da largura.</td></tr>
+          <tr><td><code>[IMAGEM]</code></td><td>Reserva a imagem. Use <code>[IMAGEM:60]</code> para 60% da largura da coluna. O campo para carregar o arquivo aparece logo abaixo da caixa.</td></tr>
           <tr><td><code>| a | b |</code></td><td>Tabela. A 2ª linha com <code>|---|</code> faz cabeçalho.</td></tr>
           <tr><td><code>[LINHAS:5]</code></td><td>5 linhas pautadas para resposta escrita.</td></tr>
           <tr><td><code>[ESPACO:30]</code></td><td>30 mm em branco para cálculo.</td></tr>
@@ -351,7 +358,7 @@ label.f textarea{resize:vertical}
           <tr><td><code>&gt;</code></td><td>Texto-base. Fica junto do enunciado, com as quebras de linha preservadas.</td></tr>
           <tr><td><code>##</code></td><td>Título de seção do formulário.</td></tr>
           <tr><td><code>[LINHAS:5]</code></td><td>Questão sem alternativas vira resposta em texto, sem nota automática.</td></tr>
-          <tr><td><code>[IMAGEM]</code></td><td>Não vai para o formulário. Adicione a imagem depois, no editor do Google Forms.</td></tr>
+          <tr><td><code>[IMAGEM]</code></td><td>Não vai para o formulário. Depois de criado, insira a figura na pergunta, no editor do Google Forms.</td></tr>
         </table>
         <p class="hintline">Tabelas viram linhas de texto. Marcadores de espaço e de coluna são ignorados.</p>
       </details>
@@ -364,12 +371,17 @@ label.f textarea{resize:vertical}
         <input type="text" id="ftitulo" placeholder="ex.: Avaliação de Língua Portuguesa — 1º ano"></label>
       <label class="f" style="margin-bottom:8px">Instruções para o aluno
         <textarea id="fdesc" rows="3">Leia atentamente cada questão e assinale apenas uma alternativa. Boa prova!</textarea></label>
-      <label class="ck"><input type="checkbox" id="fnome" checked><span>Pedir o nome completo</span></label>
-      <label class="ck"><input type="checkbox" id="fturma" checked><span>Pedir a turma</span></label>
+      <label class="f" style="margin-bottom:4px">Turmas que vão responder
+        <input type="text" id="fturmas" placeholder="ex.: 3ºA, 3ºB, 3ºC"></label>
+      <p class="hintline" style="margin-top:0">Separe por vírgula. Vira uma lista de escolha, para todos escreverem a turma do mesmo jeito (3ºA, e não 3A, 3a ou 3º ano A).</p>
+      <label class="ck" style="margin-top:8px"><input type="checkbox" id="fbanner" checked><span>Colocar o banner da escola no topo do formulário</span></label>
+      <p class="hintline" style="margin:0 0 4px 24px"><a href="banner-eejm.png" download>Baixar o banner da escola (PNG)</a>, para usar em outro lugar, como no tema do formulário.</p>
       <label class="ck"><input type="checkbox" id="fnivel" checked><span>Mostrar o nível (Fácil, Médio, Difícil) no título da questão</span></label>
-      <label class="ck"><input type="checkbox" id="fshuffle"><span>Embaralhar a ordem das questões</span></label>
+      <label class="ck"><input type="checkbox" id="fshuffle" checked><span>Embaralhar a ordem das questões</span></label>
       <label class="f" style="margin-top:8px">Pontos por questão
         <input type="number" id="fpontos" value="1" min="0" max="100" step="0.5"></label>
+      <p class="note"><b>Já vem pronto:</b> modo quiz com nota automática; página 1 com nome completo, número de chamada e turma; as questões numa página própria; formulário aberto a qualquer e-mail, sem exigir conta da escola.</p>
+      <p class="note"><b>Depois de criado</b>, o formulário pode ser editado normalmente: adicionar figuras, incluir, excluir, reformular ou reordenar perguntas, e ajustar as preferências de envio e de apresentação. Dois ajustes só podem ser feitos lá: embaralhar as alternativas e liberar a nota somente após a sua revisão manual.</p>
       <p class="hintline">Ao criar, as questões seguem direto para a sua conta Google e o formulário fica no seu Drive. Nada fica guardado fora dela.</p>
       <details class="help" id="adminurl">
         <summary>Endereço do web app (administrador)</summary>
@@ -1099,7 +1111,7 @@ label.f textarea{resize:vertical}
 
   var MODE = "print", OV = {}, FQ = {items:[], warns:{}}, FS = {};
   var MODE_KEY = KEY + "-mode", FORM_KEY = KEY + "-form";
-  var FF = {ftitulo:"s", fdesc:"s", fnome:"b", fturma:"b", fnivel:"b", fshuffle:"b", fpontos:"n", furl:"s"};
+  var FF = {ftitulo:"s", fdesc:"s", fturmas:"s", fnivel:"b", fshuffle:"b", fbanner:"b", fpontos:"n", furl:"s"};
 
   function lsGet(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } }
   function lsSet(k, v){ try{ localStorage.setItem(k, v); }catch(e){} }
@@ -1115,6 +1127,15 @@ label.f textarea{resize:vertical}
       var el = $(k); if(!el || FS[k]===undefined || FS[k]===null) return;
       if(FF[k]==="b") el.checked = !!FS[k]; else el.value = FS[k];
     });
+  }
+  // lista de turmas digitada pelo professor ("3ºA, 3ºB; 3ºC"), sem repetições
+  function turmasLista(){
+    var seen = {}, out = [];
+    String((FS.fturmas||"")).split(/[,;\n]+/).forEach(function(t){
+      t = t.replace(/\s+/g," ").trim();
+      if(t && !seen[t.toLowerCase()]){ seen[t.toLowerCase()] = true; out.push(t); }
+    });
+    return out.slice(0, 40);
   }
   function saveForm(){ lsSet(FORM_KEY, JSON.stringify({s:FS, ov:OV})); }
 
@@ -1262,7 +1283,7 @@ label.f textarea{resize:vertical}
       out.push(o);
     });
     var titulo = (FS.ftitulo||"").trim() || (($("h3").value||"").trim()) || "Prova";
-    return {v:1, titulo:titulo, descricao:FS.fdesc||"", nome:!!FS.fnome, turma:!!FS.fturma,
+    return {v:2, titulo:titulo, descricao:FS.fdesc||"", turmas:turmasLista(), banner:!!FS.fbanner,
             embaralhar:!!FS.fshuffle, pontos:(isFinite(FS.fpontos) && FS.fpontos>=0) ? FS.fpontos : 1, itens:out};
   }
 
@@ -1276,6 +1297,12 @@ label.f textarea{resize:vertical}
       save(); saveForm(); return;
     }
     var nq = 0, semG = 0, fixed = 0, html = "";
+    var turmas = turmasLista();
+    html += '<div class="fq fid"><div class="fqh"><b>Página 1 · Identificação</b><span class="tag">fixa</span></div>'+
+      (FS.fbanner ? '<div class="fbn">Banner da escola no topo</div>' : '')+
+      '<ul class="fidl"><li>Nome completo</li><li>Número de chamada</li><li>Turma: '+
+      (turmas.length ? esc(turmas.join(", ")) : '<span class="fnog-inline">sem lista de turmas: cada aluno vai digitar do seu jeito</span>')+
+      '</li></ul></div>';
     FQ.items.forEach(function(it, i){
       if(it.tipo==="secao"){ html += '<div class="fsec">'+esc(it.titulo)+'</div>'; return; }
       nq++;
@@ -1306,6 +1333,7 @@ label.f textarea{resize:vertical}
 
     var chips = ['<span class="chip"><b>'+nq+'</b> questão(ões)</span>'];
     chips.push(semG ? '<span class="chip bad"><b>'+semG+'</b> sem gabarito</span>' : '<span class="chip ok">todas com gabarito</span>');
+    if(!turmas.length) chips.push('<span class="chip warn">sem lista de turmas</span>');
     if(fixed) chips.push('<span class="chip">'+fixed+' corrigida(s) aqui <button type="button" class="freset" id="fclear">limpar</button></span>');
     if(FQ.imgs) chips.push('<span class="chip warn"><b>'+FQ.imgs+'</b> imagem(ns) não vão para o formulário</span>');
     if(FQ.dropped) chips.push('<span class="chip warn"><b>'+FQ.dropped+'</b> trecho(s) sem alternativas ignorado(s)</span>');
@@ -1321,6 +1349,7 @@ label.f textarea{resize:vertical}
     if(!nq){ alert("Cole ao menos uma questão antes de criar o formulário."); return; }
     var semG = p.itens.filter(function(x){ return x.tipo==="mc" && !(x.certa>=0); }).length;
     if(semG && !confirm(semG+" questão(ões) sem gabarito valerá(ão) 0 ponto na correção automática. Criar o formulário mesmo assim?")) return;
+    if(!p.turmas.length && !confirm("Você não informou as turmas. Sem a lista, cada aluno vai digitar a turma do seu jeito (3ºA, 3A, 3º ano A...), o que dificulta separar as respostas. Criar o formulário mesmo assim?")) return;
     var url = (FORMS_URL || FS.furl || "").trim();
     if(!/^https:\/\/script\.google(usercontent)?\.com\//.test(url)){
       var d = $("adminurl"); if(d){ d.hidden = false; d.open = true; try{ d.scrollIntoView({block:"center"}); }catch(e){} }
