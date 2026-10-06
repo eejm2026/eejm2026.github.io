@@ -229,8 +229,78 @@ details.help code{font-family:"IBM Plex Mono",monospace; font-size:11.5px; backg
   .page:last-child{break-after:auto; page-break-after:auto}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important; animation:none!important}}
+
+/* ---------- Escolha do modo ---------- */
+.modescreen{position:fixed; inset:0; z-index:100; background:var(--paper); display:flex; align-items:center; justify-content:center; padding:20px; overflow:auto}
+.modebox{max-width:760px; width:100%}
+.modekicker{margin:0 0 6px; font-family:"IBM Plex Mono",monospace; font-size:10.5px; letter-spacing:.12em; text-transform:uppercase; color:var(--ink-3); font-weight:600}
+.modebox h1{margin:0 0 8px; font-size:26px; line-height:1.2; letter-spacing:-.015em}
+.modelead{margin:0 0 22px; color:var(--ink-2); font-size:14.5px}
+.modecards{display:grid; grid-template-columns:1fr 1fr; gap:16px}
+@media (max-width:640px){ .modecards{grid-template-columns:1fr} }
+.modecard{position:relative; text-align:left; display:flex; flex-direction:column; gap:6px; padding:20px; background:var(--surface);
+  border:1px solid var(--rule); border-radius:10px; cursor:pointer; box-shadow:var(--shadow)}
+.modecard:hover,.modecard:focus-visible{border-color:var(--accent); outline:none; box-shadow:0 0 0 2px var(--accent-soft), var(--shadow)}
+.modecard .mi{font-size:26px; line-height:1}
+.modecard b{font-size:17px; color:var(--ink)}
+.modecard .md{color:var(--ink-2); font-size:13.5px; line-height:1.45}
+.modecard.last::after{content:"usado por último"; position:absolute; top:12px; right:14px; font-family:"IBM Plex Mono",monospace;
+  font-size:10px; letter-spacing:.06em; text-transform:uppercase; color:var(--ink-3)}
+.modecancel{margin-top:16px}
+body.mode-form .only-print{display:none!important}
+body.mode-print .only-form{display:none!important}
+
+/* ---------- Modo formulário ---------- */
+label.f input[type="url"], label.f textarea{background:var(--sunk); border:1px solid var(--rule); border-radius:4px; padding:6px 8px; font-size:13px; width:100%}
+label.f textarea{resize:vertical}
+.formpreview{max-width:760px; margin:0 auto; display:grid; gap:12px}
+.fq{background:var(--surface); border:1px solid var(--rule); border-radius:8px; padding:14px 16px; box-shadow:var(--shadow)}
+.fqh{display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:8px}
+.fqh b{font-size:14px}
+.fqh .tag{font-family:"IBM Plex Mono",monospace; font-size:10.5px; padding:2px 7px; border-radius:10px; background:var(--accent-soft); color:var(--accent)}
+.fqh .desc{font-family:"IBM Plex Mono",monospace; font-size:10.5px; color:var(--ink-3)}
+.fq .stem{white-space:pre-wrap; font-size:14px; line-height:1.55; color:var(--ink)}
+.falts{display:grid; gap:4px; margin-top:10px}
+.fa{display:flex; gap:10px; align-items:flex-start; width:100%; text-align:left; padding:7px 9px; border-radius:6px; cursor:pointer;
+  border:1px solid var(--rule-soft); background:transparent; font-size:13.5px; line-height:1.45}
+.fa:hover{background:var(--sunk)}
+.fa:focus-visible{outline:2px solid var(--accent); outline-offset:1px}
+.fa .l{flex:none; width:22px; height:22px; border-radius:50%; border:1px solid var(--rule); display:grid; place-items:center;
+  font-family:"IBM Plex Mono",monospace; font-size:11px; font-weight:600; color:var(--ink-2)}
+.fa.ok{background:var(--ok-soft); border-color:var(--ok)}
+.fa.ok .l{background:var(--ok); border-color:var(--ok); color:var(--surface)}
+.fnog{margin-top:8px; font-size:12px; color:var(--bad); background:var(--bad-soft); border-radius:5px; padding:6px 9px}
+.fopen{margin-top:8px; font-size:12px; color:var(--ink-3)}
+.ffb{margin-top:8px; font-size:12.5px; color:var(--ink-2)}
+.ffb summary{cursor:pointer; color:var(--accent); font-weight:600; font-size:12px}
+.ffb p{margin:6px 0 0}
+.fsec{font-family:"IBM Plex Mono",monospace; font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-3); padding:6px 2px 0}
+.freset{border:0; background:none; color:var(--accent); cursor:pointer; font-size:11.5px; padding:2px 0 0; text-decoration:underline; font-family:inherit}
+.chip .freset{padding:0 0 0 6px}
+.formpreview .empty{max-width:none}
+@media print{ #modeScreen,#formpreview{display:none!important} }
 </style>
 
+<div id="modeScreen" class="modescreen" role="dialog" aria-modal="true" aria-labelledby="modeTitle" hidden>
+  <div class="modebox">
+    <p class="modekicker">Montador de Provas · EEJM</p>
+    <h1 id="modeTitle">Como a prova vai ser aplicada?</h1>
+    <p class="modelead">As questões que você cola são as mesmas nos dois casos. Você pode trocar de modo a qualquer momento, sem perder o que escreveu.</p>
+    <div class="modecards">
+      <button type="button" class="modecard" id="modePrint">
+        <span class="mi" aria-hidden="true">🖨️</span>
+        <b>Prova impressa</b>
+        <span class="md">Folha A4 com o cabeçalho padronizado da escola, uma ou duas colunas e o maior tamanho de letra que cabe. Sai em PDF ou em Word.</span>
+      </button>
+      <button type="button" class="modecard" id="modeForm">
+        <span class="mi" aria-hidden="true">📋</span>
+        <b>Formulário Google</b>
+        <span class="md">Cria na sua conta um formulário em modo quiz, com gabarito, nota automática e feedback de acerto e de erro em cada questão.</span>
+      </button>
+    </div>
+    <button type="button" class="btn ghost modecancel" id="modeCancel" hidden>Continuar no modo atual</button>
+  </div>
+</div>
 <div class="topbar">
   <div class="brand">
     <a href="../" class="back" aria-label="Voltar às ferramentas" style="font-size:12.5px;font-weight:600;color:var(--accent);text-decoration:none;white-space:nowrap">← Ferramentas</a>
@@ -238,10 +308,12 @@ details.help code{font-family:"IBM Plex Mono",monospace; font-size:11.5px; backg
     <span class="sub">EEJM · Campo Grande/MS</span>
   </div>
   <div class="actions">
+    <button class="btn ghost" id="btnMode" type="button">Trocar modo</button>
     <button class="btn ghost" id="btnTheme" type="button">Tema</button>
-    <button class="btn" id="btnFit" type="button">Ajustar às folhas</button>
-    <button class="btn" id="btnDocx" type="button">Baixar Word (.docx)</button>
-    <button class="btn primary" id="btnPrint" type="button">Imprimir / PDF</button>
+    <button class="btn only-print" id="btnFit" type="button">Ajustar às folhas</button>
+    <button class="btn only-print" id="btnDocx" type="button">Baixar Word (.docx)</button>
+    <button class="btn primary only-print" id="btnPrint" type="button">Imprimir / PDF</button>
+    <button class="btn primary only-form" id="btnForm" type="button">Criar formulário Google</button>
   </div>
 </div>
 
@@ -252,7 +324,7 @@ details.help code{font-family:"IBM Plex Mono",monospace; font-size:11.5px; backg
       <h2>Questões</h2>
       <textarea id="src" spellcheck="false"></textarea>
       <p class="hintline">Cole as questões já prontas. O conteúdo fica salvo neste navegador.</p>
-      <details class="help">
+      <details class="help only-print">
         <summary>Como escrever (marcadores)</summary>
         <table>
           <tr><td><code>1)</code></td><td>Inicia uma questão. Linhas seguintes continuam o enunciado.</td></tr>
@@ -268,10 +340,46 @@ details.help code{font-family:"IBM Plex Mono",monospace; font-size:11.5px; backg
           <tr><td><code>[QUEBRA]</code></td><td>Força o início de uma nova folha.</td></tr>
         </table>
       </details>
-      <div id="imgpanel" style="margin-top:12px"></div>
+      <details class="help only-form">
+        <summary>Como escrever (formulário)</summary>
+        <table>
+          <tr><td><code>1)</code></td><td>Inicia uma questão. Também vale <code>Questão 1</code>, com ou sem <code>— Fácil — [descritor]</code>.</td></tr>
+          <tr><td><code>A)</code></td><td>Alternativa. Aceita <code>a)</code>, <code>A.</code>, <code>(A)</code>.</td></tr>
+          <tr><td><code>*B)</code></td><td>Marca a correta. Também vale uma linha <code>Gabarito: B</code>.</td></tr>
+          <tr><td><code>Feedback para acerto:</code></td><td>Texto que o aluno vê ao acertar. O mesmo vale para <code>Feedback para erro:</code>.</td></tr>
+          <tr><td><code>Fonte:</code></td><td>Link complementar do feedback, em <code>[texto](https://...)</code> ou só o endereço.</td></tr>
+          <tr><td><code>&gt;</code></td><td>Texto-base. Fica junto do enunciado, com as quebras de linha preservadas.</td></tr>
+          <tr><td><code>##</code></td><td>Título de seção do formulário.</td></tr>
+          <tr><td><code>[LINHAS:5]</code></td><td>Questão sem alternativas vira resposta em texto, sem nota automática.</td></tr>
+          <tr><td><code>[IMAGEM]</code></td><td>Não vai para o formulário. Adicione a imagem depois, no editor do Google Forms.</td></tr>
+        </table>
+        <p class="hintline">Tabelas viram linhas de texto. Marcadores de espaço e de coluna são ignorados.</p>
+      </details>
+      <div id="imgpanel" class="only-print" style="margin-top:12px"></div>
     </div>
 
-    <div class="fs">
+    <div class="fs only-form" id="formset">
+      <h2>Formulário Google</h2>
+      <label class="f" style="margin-bottom:8px">Título do formulário
+        <input type="text" id="ftitulo" placeholder="ex.: Avaliação de Língua Portuguesa — 1º ano"></label>
+      <label class="f" style="margin-bottom:8px">Instruções para o aluno
+        <textarea id="fdesc" rows="3">Leia atentamente cada questão e assinale apenas uma alternativa. Boa prova!</textarea></label>
+      <label class="ck"><input type="checkbox" id="fnome" checked><span>Pedir o nome completo</span></label>
+      <label class="ck"><input type="checkbox" id="fturma" checked><span>Pedir a turma</span></label>
+      <label class="ck"><input type="checkbox" id="fnivel" checked><span>Mostrar o nível (Fácil, Médio, Difícil) no título da questão</span></label>
+      <label class="ck"><input type="checkbox" id="fshuffle"><span>Embaralhar a ordem das questões</span></label>
+      <label class="f" style="margin-top:8px">Pontos por questão
+        <input type="number" id="fpontos" value="1" min="0" max="100" step="0.5"></label>
+      <p class="hintline">Ao criar, as questões seguem direto para a sua conta Google e o formulário fica no seu Drive. Nada fica guardado fora dela.</p>
+      <details class="help" id="adminurl">
+        <summary>Endereço do web app (administrador)</summary>
+        <label class="f" style="margin-top:8px">Endereço da implantação do Apps Script
+          <input type="url" id="furl" placeholder="https://script.google.com/a/macros/.../exec"></label>
+        <p class="hintline">Preenchido uma única vez. O PCPI pode fixar o endereço no código e este campo some.</p>
+      </details>
+    </div>
+
+    <div class="fs only-print">
       <h2>Ocupação da folha</h2>
       <label class="f" style="margin-bottom:10px">Folhas-alvo
         <select id="target">
@@ -309,7 +417,7 @@ details.help code{font-family:"IBM Plex Mono",monospace; font-size:11.5px; backg
       </label>
     </div>
 
-    <div class="fs">
+    <div class="fs only-print">
       <h2>Página e letra</h2>
       <div class="grid2">
         <label class="f">Fonte
@@ -341,7 +449,7 @@ details.help code{font-family:"IBM Plex Mono",monospace; font-size:11.5px; backg
         <span>Acrescentar "Página X de Y" no rodapé</span></label>
     </div>
 
-    <div class="fs">
+    <div class="fs only-print">
       <h2>Cabeçalho padronizado</h2>
       <label class="f" style="margin-bottom:8px">Nome da escola (azul, centralizado)
         <input type="text" id="escola" value="EE Joaquim Murtinho" placeholder="Nome da escola"></label>
@@ -388,7 +496,7 @@ details.help code{font-family:"IBM Plex Mono",monospace; font-size:11.5px; backg
   <main class="desk">
     <div class="deskbar">
       <div class="summary" id="summary"></div>
-      <div class="row">
+      <div class="row only-print">
         <label class="f" style="font-size:11px">Zoom
           <select id="zoom" style="width:auto">
             <option value=".5">50%</option>
@@ -399,7 +507,8 @@ details.help code{font-family:"IBM Plex Mono",monospace; font-size:11.5px; backg
         </label>
       </div>
     </div>
-    <div class="pages" id="pages"></div>
+    <div class="pages only-print" id="pages"></div>
+    <div class="formpreview only-form" id="formpreview"></div>
   </main>
 </div>
 
@@ -778,6 +887,7 @@ details.help code{font-family:"IBM Plex Mono",monospace; font-size:11.5px; backg
   var PARSED = null, LAST = null;
 
   function render(){
+    if(MODE==="form"){ renderForm(); return; }
     readUI();
     PARSED = parse($("src").value);
     renderImgPanel(PARSED.images);
@@ -980,6 +1090,291 @@ details.help code{font-family:"IBM Plex Mono",monospace; font-size:11.5px; backg
     var cur = document.documentElement.getAttribute("data-theme");
     var next = cur==="dark" ? "light" : (cur==="light" ? "dark" : "dark");
     document.documentElement.setAttribute("data-theme", next);
+  });
+
+  /* ---------------- modo de trabalho: prova impressa ou Formulário Google ---------------- */
+  // Endereço do web app (Apps Script) que cria o formulário. Preencha uma vez, depois de implantar o Codigo.gs.
+  // Enquanto estiver vazio, o campo "Endereço do web app" aparece no painel do modo formulário.
+  var FORMS_URL = "";
+
+  var MODE = "print", OV = {}, FQ = {items:[], warns:{}}, FS = {};
+  var MODE_KEY = KEY + "-mode", FORM_KEY = KEY + "-form";
+  var FF = {ftitulo:"s", fdesc:"s", fnome:"b", fturma:"b", fnivel:"b", fshuffle:"b", fpontos:"n", furl:"s"};
+
+  function lsGet(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } }
+  function lsSet(k, v){ try{ localStorage.setItem(k, v); }catch(e){} }
+
+  function readForm(){
+    Object.keys(FF).forEach(function(k){
+      var el = $(k); if(!el) return;
+      FS[k] = FF[k]==="b" ? el.checked : (FF[k]==="n" ? parseFloat(el.value) : el.value);
+    });
+  }
+  function writeForm(){
+    Object.keys(FF).forEach(function(k){
+      var el = $(k); if(!el || FS[k]===undefined || FS[k]===null) return;
+      if(FF[k]==="b") el.checked = !!FS[k]; else el.value = FS[k];
+    });
+  }
+  function saveForm(){ lsSet(FORM_KEY, JSON.stringify({s:FS, ov:OV})); }
+
+  /*PF-START*/
+  /* Leitura das questões para o formulário. Aceita o formato do Montador (1) A) *B) >) e o do Laboratório de
+     Questões (Questão N — Nível — [descritor], Gabarito, Feedback para acerto/erro, Fonte). */
+  function stripMd(s){
+    return String(s).replace(/\*\*/g,"").replace(/\*([^*\n]+)\*/g,"$1").replace(/`/g,"").replace(/[ \t]+/g," ").trim();
+  }
+  function parseForm(text){
+    var lines = String(text).replace(/\r/g,"").split("\n");
+    var items = [], cur = null, lastAlt = false;
+    var B = {stem:[], kind:null};           // texto-base pendente (> ou tabela antes da questão)
+    var imgs = 0, dropped = 0;
+
+    function add(o, kind, t){
+      if(!t) return;
+      if(o.kind===kind && o.stem.length) o.stem[o.stem.length-1] += (kind==="p" ? " " : "\n") + t;
+      else o.stem.push(t);
+      o.kind = kind;
+    }
+    function finish(){
+      var q = cur; cur = null; lastAlt = false;
+      if(!q) return;
+      var enun = q.stem.join("\n\n").trim();
+      if(q.alts.length){
+        var star = -1;
+        q.alts.forEach(function(a, i){ if(a.ok && star<0) star = i; });
+        var certa = star>=0 ? star : (q.gab!=null ? q.gab : -1);
+        if(certa >= q.alts.length) certa = -1;
+        items.push({tipo:"mc", nivel:q.nivel, desc:q.desc, enunciado:enun,
+          alts:q.alts.map(function(a){ return a.t; }), certa:certa,
+          ok:q.ok, erro:q.erro, link:q.link, img:q.img});
+      } else if(q.lines || q.hdr){
+        items.push({tipo:"aberta", nivel:q.nivel, desc:q.desc, enunciado:enun, img:q.img});
+      } else {
+        dropped++;
+      }
+    }
+    function openQ(hdr){
+      finish();
+      cur = {hdr:hdr, nivel:"", desc:"", stem:B.stem.slice(), kind:null, alts:[], gab:null,
+             ok:"", erro:"", link:null, lines:false, img:false};
+      B.stem = []; B.kind = null;
+      return cur;
+    }
+    function linkOf(s){
+      var m = s.match(/\[([^\]]+)\]\((https?:[^)\s]+)\)/);
+      if(m) return {url:m[2], texto:m[1].trim()};
+      m = s.match(/https?:\/\/[^\s)>\]]+/);
+      return m ? {url:m[0], texto:"Recurso complementar"} : null;
+    }
+
+    for(var i=0; i<lines.length; i++){
+      var L = lines[i].replace(/\*\*/g,""), m;
+
+      if(!L.trim()){ if(cur){ cur.kind = null; } B.kind = null; lastAlt = false; continue; }
+      if(/^\s*[-–—_=*]{3,}\s*$/.test(L)){ finish(); continue; }
+
+      // cabeçalho "Questão N — Nível — [descritor]"
+      if((m = L.match(/^\s*#{0,4}\s*QUEST[ÃA]O\s+(\d{1,3})\b[\s:.\-–—)]*(.*)$/i))){
+        var q = openQ(true), rest = m[2].trim(), mn;
+        if((mn = rest.match(/^(f[aá]cil|m[eé]dio|dif[ií]cil)\b/i))){
+          var n0 = mn[1].toLowerCase();
+          q.nivel = /^f/.test(n0) ? "Fácil" : (/^m/.test(n0) ? "Médio" : "Difícil");
+          rest = rest.slice(mn[0].length);
+        }
+        var md = rest.match(/\[([^\]]+)\]/);
+        if(md){ q.desc = md[1].trim(); rest = rest.replace(md[0], ""); }
+        rest = rest.replace(/^[\s:.\-–—|)]+/, "").trim();
+        if(rest) add(q, "p", stripMd(rest));
+        continue;
+      }
+      if((m = L.match(/^\s*##\s+(.*)$/))){ finish(); items.push({tipo:"secao", titulo:stripMd(m[1])}); continue; }
+      if(/^\s*\[(COLUNA|QUEBRA)\]\s*$/i.test(L) || /^\s*\[ESPACO:\s*\d+\]\s*$/i.test(L)) continue;
+      if(/^\s*\[IMAGEM(?::\s*\d+)?\]\s*$/i.test(L)){ imgs++; if(cur) cur.img = true; continue; }
+      if((m = L.match(/^\s*\[LINHAS:\s*\d+\]\s*$/i))){ if(cur) cur.lines = true; continue; }
+
+      // rótulos do Laboratório de Questões
+      if(cur && (m = L.match(/^\s*gabarito\s*:\s*\(?([A-Ea-e])\)?\s*\.?\s*$/i))){ cur.gab = m[1].toUpperCase().charCodeAt(0)-65; lastAlt = false; continue; }
+      if(/^\s*(gabarito|tempo estimado|resposta)\s*:/i.test(L)){ lastAlt = false; continue; }
+      if(cur && (m = L.match(/^\s*feedback\s+(?:para|de|do)\s+(acerto|erro)\s*:\s*(.*)$/i))){
+        if(/^a/i.test(m[1])) cur.ok = stripMd(m[2]); else cur.erro = stripMd(m[2]);
+        lastAlt = false; continue;
+      }
+      if(cur && (m = L.match(/^\s*(?:fonte|recurso)(?:\s+ou\s+recurso\s+complementar)?\s*:\s*(.*)$/i))){
+        var lk = linkOf(m[1]); if(lk) cur.link = lk; lastAlt = false; continue;
+      }
+
+      // texto-base
+      if((m = L.match(/^\s*>\s?(.*)$/))){
+        var tq = stripMd(m[1]);
+        if(cur && cur.hdr && !cur.alts.length) add(cur, "q", tq);
+        else { if(cur && !cur.hdr) finish(); add(B, "q", tq); }
+        lastAlt = false; continue;
+      }
+
+      // tabela
+      if(/^\s*\|(.+)\|\s*$/.test(L)){
+        var rows = [];
+        while(i<lines.length && /^\s*\|(.+)\|\s*$/.test(lines[i])){
+          if(!/^\s*\|[\s\-:|]+\|\s*$/.test(lines[i]))
+            rows.push(stripMd(lines[i].trim().replace(/^\|/,"").replace(/\|$/,"").split("|").map(function(c){ return c.trim(); }).join(" | ")));
+          i++;
+        }
+        i--;
+        var tgt = (cur && !cur.alts.length) ? cur : B;
+        rows.forEach(function(r){ add(tgt, "t", r); });
+        tgt.kind = null; lastAlt = false; continue;
+      }
+
+      // início de questão numerada
+      if((m = L.match(/^\s*(\d{1,3})\s*[\)\.\-–]\s+(.*)$/))){
+        var qn = openQ(false); add(qn, "p", stripMd(m[2])); continue;
+      }
+
+      // alternativa
+      if(cur && (m = L.match(/^\s*(\*?)\s*\(?([A-Ea-e])\)?\s*[\)\.\-–]\s+(.*)$/))){
+        cur.alts.push({t:stripMd(m[3]), ok:m[1]==="*"});
+        lastAlt = true; continue;
+      }
+
+      // texto solto
+      if(cur && !cur.alts.length){ add(cur, "p", stripMd(L)); continue; }
+      if(cur && cur.alts.length && lastAlt){ cur.alts[cur.alts.length-1].t += " " + stripMd(L); continue; }
+      // sem questão aberta (ou depois das alternativas): conversa solta, ignorada
+    }
+    finish();
+    return {items:items, imgs:imgs, dropped:dropped};
+  }
+  /*PF-END*/
+
+  function buildPayload(){
+    readForm();
+    var qn = 0, out = [];
+    FQ.items.forEach(function(it, i){
+      if(it.tipo==="secao"){ out.push({tipo:"secao", titulo:it.titulo}); return; }
+      qn++;
+      var o = {tipo:it.tipo, titulo:"Questão "+qn+((FS.fnivel && it.nivel) ? " ("+it.nivel+")" : ""), enunciado:it.enunciado};
+      if(it.tipo==="mc"){
+        o.alts = it.alts;
+        o.certa = (OV[i]!==undefined && OV[i] < it.alts.length) ? OV[i] : it.certa;
+        o.ok = it.ok; o.erro = it.erro; o.link = it.link;
+      }
+      out.push(o);
+    });
+    var titulo = (FS.ftitulo||"").trim() || (($("h3").value||"").trim()) || "Prova";
+    return {v:1, titulo:titulo, descricao:FS.fdesc||"", nome:!!FS.fnome, turma:!!FS.fturma,
+            embaralhar:!!FS.fshuffle, pontos:(isFinite(FS.fpontos) && FS.fpontos>=0) ? FS.fpontos : 1, itens:out};
+  }
+
+  function renderForm(){
+    readForm();
+    FQ = parseForm($("src").value);
+    var out = $("formpreview");
+    if(!FQ.items.length){
+      out.innerHTML = '<div class="empty">Cole as questões no painel à esquerda para ver o formulário.</div>';
+      $("summary").innerHTML = "";
+      save(); saveForm(); return;
+    }
+    var nq = 0, semG = 0, fixed = 0, html = "";
+    FQ.items.forEach(function(it, i){
+      if(it.tipo==="secao"){ html += '<div class="fsec">'+esc(it.titulo)+'</div>'; return; }
+      nq++;
+      var head = '<div class="fqh"><b>Questão '+nq+'</b>'+(it.nivel ? '<span class="tag">'+esc(it.nivel)+'</span>' : '')+
+                 (it.desc ? '<span class="desc">'+esc(it.desc)+'</span>' : '')+'</div>';
+      var body = '<div class="stem">'+esc(it.enunciado)+'</div>';
+      if(it.tipo==="aberta"){
+        html += '<div class="fq">'+head+body+'<div class="fopen">Resposta em texto, corrigida por você depois (não vale pontos na correção automática).</div></div>';
+        return;
+      }
+      var certa = it.certa;
+      if(OV[i]!==undefined && OV[i] < it.alts.length){ certa = OV[i]; fixed++; }
+      if(certa < 0) semG++;
+      var alts = it.alts.map(function(t, k){
+        return '<button type="button" class="fa'+(k===certa?' ok':'')+'" data-q="'+i+'" data-i="'+k+'" aria-pressed="'+(k===certa)+'">'+
+               '<span class="l">'+String.fromCharCode(65+k)+'</span><span>'+esc(t)+'</span></button>';
+      }).join("");
+      var fb = (it.ok || it.erro || it.link) ?
+        '<details class="ffb"><summary>Feedback</summary>'+
+        (it.ok ? '<p><b>Acerto:</b> '+esc(it.ok)+'</p>' : '')+
+        (it.erro ? '<p><b>Erro:</b> '+esc(it.erro)+'</p>' : '')+
+        (it.link ? '<p><b>Recurso:</b> '+esc(it.link.texto)+'</p>' : '')+'</details>' : '';
+      var warn = certa < 0 ? '<div class="fnog">Sem gabarito: marque a alternativa correta clicando nela.</div>' : '';
+      var reset = (OV[i]!==undefined) ? '<button type="button" class="freset" data-reset="'+i+'">voltar ao gabarito do texto</button>' : '';
+      html += '<div class="fq">'+head+body+'<div class="falts">'+alts+'</div>'+warn+fb+reset+'</div>';
+    });
+    out.innerHTML = html;
+
+    var chips = ['<span class="chip"><b>'+nq+'</b> questão(ões)</span>'];
+    chips.push(semG ? '<span class="chip bad"><b>'+semG+'</b> sem gabarito</span>' : '<span class="chip ok">todas com gabarito</span>');
+    if(fixed) chips.push('<span class="chip">'+fixed+' corrigida(s) aqui <button type="button" class="freset" id="fclear">limpar</button></span>');
+    if(FQ.imgs) chips.push('<span class="chip warn"><b>'+FQ.imgs+'</b> imagem(ns) não vão para o formulário</span>');
+    if(FQ.dropped) chips.push('<span class="chip warn"><b>'+FQ.dropped+'</b> trecho(s) sem alternativas ignorado(s)</span>');
+    $("summary").innerHTML = chips.join("");
+    var dm = document.getElementById("adminurl");
+    if(dm) dm.hidden = !!FORMS_URL;
+    save(); saveForm();
+  }
+
+  function sendForm(){
+    var p = buildPayload();
+    var nq = p.itens.filter(function(x){ return x.tipo!=="secao"; }).length;
+    if(!nq){ alert("Cole ao menos uma questão antes de criar o formulário."); return; }
+    var semG = p.itens.filter(function(x){ return x.tipo==="mc" && !(x.certa>=0); }).length;
+    if(semG && !confirm(semG+" questão(ões) sem gabarito valerá(ão) 0 ponto na correção automática. Criar o formulário mesmo assim?")) return;
+    var url = (FORMS_URL || FS.furl || "").trim();
+    if(!/^https:\/\/script\.google(usercontent)?\.com\//.test(url)){
+      var d = $("adminurl"); if(d){ d.hidden = false; d.open = true; try{ d.scrollIntoView({block:"center"}); }catch(e){} }
+      alert("O endereço do web app que cria o formulário ainda não foi configurado. Peça ao PCPI ou cole o endereço em \"Endereço do web app\", no painel à esquerda.");
+      return;
+    }
+    var f = document.createElement("form");
+    f.method = "POST"; f.action = url; f.target = "_blank"; f.acceptCharset = "utf-8"; f.style.display = "none";
+    var inp = document.createElement("input"); inp.type = "hidden"; inp.name = "dados"; inp.value = JSON.stringify(p);
+    f.appendChild(inp); document.body.appendChild(f); f.submit();
+    setTimeout(function(){ if(f.parentNode) f.parentNode.removeChild(f); }, 1500);
+  }
+
+  /* troca de modo */
+  function applyMode(m){
+    MODE = m;
+    document.body.classList.remove("mode-print", "mode-form");
+    document.body.classList.add("mode-" + m);
+  }
+  function chooseMode(m){
+    applyMode(m); lsSet(MODE_KEY, m);
+    $("modeScreen").hidden = true;
+    render();
+    try{ $("src").focus({preventScroll:true}); }catch(e){}
+  }
+  function showChooser(canCancel){
+    var last = lsGet(MODE_KEY);
+    ["modePrint","modeForm"].forEach(function(id){
+      var el = $(id); el.classList.toggle("last", (id==="modePrint" ? "print" : "form")===last);
+    });
+    $("modeCancel").hidden = !canCancel;
+    $("modeScreen").hidden = false;
+    $("modePrint").focus();
+  }
+  $("modePrint").addEventListener("click", function(){ chooseMode("print"); });
+  $("modeForm").addEventListener("click", function(){ chooseMode("form"); });
+  $("modeCancel").addEventListener("click", function(){ $("modeScreen").hidden = true; });
+  $("btnMode").addEventListener("click", function(){ showChooser(true); });
+  document.addEventListener("keydown", function(e){
+    if(e.key==="Escape" && !$("modeScreen").hidden && !$("modeCancel").hidden) $("modeScreen").hidden = true;
+  });
+  $("btnForm").addEventListener("click", sendForm);
+
+  Object.keys(FF).forEach(function(k){
+    var el = $(k); if(!el) return;
+    el.addEventListener("input", deb); el.addEventListener("change", deb);
+  });
+  $("formpreview").addEventListener("click", function(e){
+    var b = e.target.closest ? e.target.closest("button") : null; if(!b) return;
+    if(b.hasAttribute("data-i")){ OV[b.getAttribute("data-q")] = parseInt(b.getAttribute("data-i"), 10); renderForm(); }
+    else if(b.hasAttribute("data-reset")){ delete OV[b.getAttribute("data-reset")]; renderForm(); }
+  });
+  $("summary").addEventListener("click", function(e){
+    if(e.target && e.target.id==="fclear"){ OV = {}; renderForm(); }
   });
 
   /* ---------------- exportação .docx (sem bibliotecas) ---------------- */
@@ -1219,7 +1614,11 @@ details.help code{font-family:"IBM Plex Mono",monospace; font-size:11.5px; backg
   $("src").value = (saved && saved.text) ? saved.text : SAMPLE;
     try{ var lg = localStorage.getItem(KEY+"-logo"); if(lg) IMAGES.logo = lg; var lgl = localStorage.getItem(KEY+"-logoL"); if(lgl) IMAGES.logoL = lgl; }catch(e){}
   if(saved && saved.s) writeUI(); else { readUI(); setCols(2, true); ["fsz","lh","gap","colgap"].forEach(syncRange); }
+  try{ var fsv = JSON.parse(lsGet(FORM_KEY) || "null"); if(fsv){ FS = fsv.s || {}; OV = fsv.ov || {}; } }catch(e){}
+  writeForm();
+  applyMode(lsGet(MODE_KEY)==="form" ? "form" : "print");
   render();
+  showChooser(false);
 })();
 </script>
 
