@@ -111,6 +111,7 @@ section{margin-top:26px;}
 .btn-copy:hover{background:var(--blue-mid);transform:translateY(-1px);box-shadow:0 6px 18px rgba(26,58,143,.25);}
 .btn-copy:focus-visible{outline:3px solid var(--blue-mid);outline-offset:2px;}
 .btn-copy.done{background:var(--green);}
+a.btn-copy{text-decoration:none;}
 .proto-box{
   border:1.5px solid var(--gray-mid);border-radius:10px;background:#fbfcfe;
   max-height:400px;overflow:auto;
@@ -206,21 +207,23 @@ td:last-child{color:var(--text-muted);}
           <div class="step-num">3</div>
           <div class="step-body">
             <div class="step-title">Copie o texto abaixo e cole no campo Instruções</div>
-            <div class="step-text">Use o botão <strong>Copiar instruções</strong> logo abaixo e cole tudo no campo <strong>Instruções</strong> do Gem. É um texto longo, e é para ser — ele é o que ensina a ferramenta a trabalhar. <strong>Não resuma, não corte pedaços e não peça ao Gemini para reescrever as instruções.</strong></div>
+            <div class="step-text">Use o botão <strong>Copiar instruções</strong> logo abaixo e cole tudo no campo <strong>Instruções</strong> do Gem. É um texto longo, e é para ser — ele é o que ensina a ferramenta a trabalhar. <strong>Não resuma, não corte pedaços e não peça ao Gemini para reescrever as instruções.</strong> Ao colar, role até o fim do campo e confira se o último parágrafo, que começa por <em>“SAÍDA PARA O MONTADOR DE PROVAS”</em>, aparece inteiro.</div>
           </div>
         </div>
         <div class="step">
           <div class="step-num">4</div>
           <div class="step-body">
-            <div class="step-title">Deixe o campo Conhecimento vazio</div>
-            <div class="step-text">O texto vai em <strong>Instruções</strong>, não em Conhecimento. Os dois campos parecem equivalentes e não são: Instruções é o que o Gem <em>é</em> e vale em toda conversa; Conhecimento é um material que ele <em>consulta</em> às vezes. Colado no lugar errado, o Gem passa a descrever o procedimento em vez de executá-lo.</div>
+            <div class="step-title">Suba o arquivo de conhecimento no campo Conhecimento</div>
+            <div class="step-text">Baixe o arquivo no botão abaixo e, no Gem, procure o campo <strong>Conhecimento</strong> (logo abaixo de Instruções). Clique em adicionar arquivos e escolha o arquivo baixado. Ele traz o que não cabe nas instruções: o formato das questões para <strong>Google Forms</strong> com feedback, o texto <strong>pronto para colar no Montador de Provas</strong>, recuperação paralela, atividade domiciliar e versão adaptada.<br><br>
+            <div style="margin:2px 0 10px"><a class="btn-copy" href="laboratorio-conhecimento-forms.txt" download="laboratorio-conhecimento-forms.txt">⬇️ Baixar arquivo de conhecimento</a></div>
+            Os dois campos não são iguais: <strong>Instruções</strong> é o que o Gem <em>é</em> e vale em toda conversa; <strong>Conhecimento</strong> é um material que ele <em>consulta</em> quando precisa. Por isso o texto das instruções não vai em Conhecimento, nem este arquivo em Instruções: no lugar errado, o Gem passa a descrever o procedimento em vez de executá-lo.</div>
           </div>
         </div>
         <div class="step">
           <div class="step-num">5</div>
           <div class="step-body">
-            <div class="step-title">Salve e faça os dois testes</div>
-            <div class="step-text">Levam um minuto e mostram se o texto foi colado por inteiro. Estão logo depois do bloco de instruções.</div>
+            <div class="step-title">Salve e faça os três testes</div>
+            <div class="step-text">Levam poucos minutos e mostram se o texto e o arquivo foram colados por inteiro. Estão logo depois do bloco de instruções.</div>
           </div>
         </div>
       </div>
@@ -441,8 +444,14 @@ Direto, respeitoso, sem jargão e sem elogio de praxe. Não repita a pergunta do
 - Nenhuma técnica impede que uma IA responda a um item: elas reduzem a utilidade da terceirização e, independentemente disso, melhoram o item como instrumento de medida.
 - A medida de maior efeito é de aplicação, não de elaboração: prova presencial, em janela de tempo definida.
 - Detectores de IA não são prova de fraude e não devem fundamentar penalização.
-- A verificação legítima é pedagógica: comparar a produção com o desempenho presencial e pedir que o estudante retome o raciocínio com as próprias palavras.</pre>
+- A verificação legítima é pedagógica: comparar a produção com o desempenho presencial e pedir que o estudante retome o raciocínio com as próprias palavras.
+
+---
+
+SAÍDA PARA O MONTADOR DE PROVAS (regra rígida): ao entregar prova, questões ou versões, ou quando o professor disser papel, impressa ou Forms, entregue UM bloco de código em TEXTO PURO, no modelo do arquivo "laboratorio-conhecimento-forms" (seção 2). Dentro do bloco é PROIBIDO negrito, itálico, crase, lista com marcador, emoji, LaTeX, linhas --- e qualquer * ou _ para enfatizar; destaque só em MAIÚSCULAS. O único asterisco permitido é o da alternativa correta, colado na letra (*B) texto). Use ## só para partes, uma alternativa por linha, [IMAGEM:55], [LINHAS:5], &gt; para texto-base; no Forms, "Questão N — Nível — [descritor]", "Gabarito: X" em linha própria e feedbacks de uma linha. Comentários, gabarito comentado, tempo, imagens e [PROFESSOR: …] ficam FORA do bloco. Antes de enviar, releia o bloco e apague símbolos de formatação. Consulte o arquivo.
+</pre>
       </div>
+      <div class="proto-hint" style="margin-bottom:10px"><strong>Falta um arquivo:</strong> depois de colar as instruções, suba também o arquivo de conhecimento (passo 4). <a class="btn-copy" style="padding:7px 14px;font-size:13px;margin-left:6px" href="laboratorio-conhecimento-forms.txt" download="laboratorio-conhecimento-forms.txt">⬇️ Baixar arquivo de conhecimento</a></div>
       <div class="proto-hint">Se o botão não funcionar no seu navegador, clique dentro do quadro, selecione tudo com Ctrl+A e copie com Ctrl+C.</div>
     </div>
   </section>
@@ -461,9 +470,14 @@ Direto, respeitoso, sem jargão e sem elogio de praxe. Não repita a pergunta do
         <code>Física, 3º ano. Não fiz experimento nenhum. Reformule: qual é a unidade de resistência elétrica?</code><br><br>
         Deve voltar uma questão reformulada com uma marcação parecida com <code>[PROFESSOR: inserir o valor medido pelo grupo]</code>. Isso é o certo: significa que a ferramenta <strong>não inventa</strong> o que aconteceu na sua aula — ela deixa o espaço para você preencher com o dado real.</div>
       </div>
+      <div class="box box-green">
+        <div class="box-title">Teste 3 — o arquivo de conhecimento</div>
+        <div class="box-text">Escreva: <code>Faça 3 questões de Física, 3º ano, sobre Lei de Ohm, para Google Forms.</code><br>
+        As questões devem vir <strong>dentro de um quadro de código</strong>, em texto simples, sem negrito, com <code>Questão 1 — Fácil — …</code>, uma alternativa por linha, <code>Gabarito:</code> e os feedbacks. Se vier solto na conversa, cheio de asteriscos, o arquivo não foi anexado em Conhecimento: refaça o passo 4.</div>
+      </div>
       <div class="box box-amber">
         <div class="box-title">Se der errado</div>
-        <div class="box-text">Se no teste 2 vier uma questão com valores de experimento prontos, como se a sua turma tivesse medido algo, o texto foi colado pela metade. Refaça o passo 3 — apague o conteúdo do campo Instruções e cole tudo de novo.</div>
+        <div class="box-text">Se no teste 2 vier uma questão com valores de experimento prontos, como se a sua turma tivesse medido algo, o texto foi colado pela metade. Refaça o passo 3 — apague o conteúdo do campo Instruções e cole tudo de novo. Se o problema for só o formato da prova, confira o passo 4.</div>
       </div>
     </div>
   </section>
@@ -496,7 +510,7 @@ Direto, respeitoso, sem jargão e sem elogio de praxe. Não repita a pergunta do
   </section>
 
   <section>
-    <h2 class="section-title">💡 Duas formas de usar</h2>
+    <h2 class="section-title">💡 Três formas de usar</h2>
     <div class="card">
       <div class="box box-blue">
         <div class="box-title">Quando você quer trabalhar</div>
@@ -505,6 +519,10 @@ Direto, respeitoso, sem jargão e sem elogio de praxe. Não repita a pergunta do
       <div class="box box-green">
         <div class="box-title">Quando você quer entender</div>
         <div class="box-text">Peça para analisar. Ele explica o que a questão avalia hoje, onde está frágil e por quê, o que da sua aula poderia entrar nela e por que a nova versão mede melhor. É mais lento e ensina mais — vale a pena na primeira vez.</div>
+      </div>
+      <div class="box box-amber">
+        <div class="box-title">Quando você quer a prova pronta</div>
+        <div class="box-text">Diga se é <strong>papel</strong> ou <strong>Forms</strong>. O Laboratório entrega o texto num quadro de código; é só clicar em copiar e colar no <a href="../montador-de-provas/">Montador de Provas</a>, que monta a folha A4 ou cria o formulário. Comentários, gabarito comentado e o que falta completar vêm fora do quadro, para você não colar por engano.</div>
       </div>
     </div>
   </section>
