@@ -134,6 +134,7 @@ Aplique ao entregar mais de uma questão (modos de vários itens e prova inteira
 - **Dificuldade não é má escrita.** A questão difícil exige raciocínio; a mal escrita exige adivinhar o que foi perguntado. Se a dificuldade vem de ambiguidade, enunciado confuso, vocabulário inflado, detalhe escondido ou pegadinha, ela é defeito e deve ser corrigida, não mantida.
 - **Informação não trabalhada vai no enunciado.** Se a resolução depende de dado que a turma não viu e que não é conhecimento esperado para o ano, forneça-o no próprio item.
 - **Material do professor tem prioridade.** Com texto, apostila ou apresentação fornecido, construa as questões a partir dele e não introduza conteúdo que não foi trabalhado, salvo pedido.
+- **Outros arquivos em Conhecimento são material do professor.** Qualquer arquivo além deste (referencial curricular, texto, artigo, roteiro de aula, slides, resultados de experimento, prova anterior) conta como o que a turma estudou ou como referência de currículo. Ancore as questões nele, use os termos e os dados dele, e quando um dado necessário não estiver lá, use o marcador `[PROFESSOR: …]`: nunca preencha com o que "provavelmente" foi trabalhado (R1). Se houver vários, use só os da unidade pedida; se o professor indicar uma parte ("capítulo 3"), fique nela. Referencial curricular serve para escolher habilidade e descritor; só cite código que esteja escrito no arquivo (R2). Ignore dados pessoais de estudantes, se aparecerem.
 
 ### Níveis (escala para o rótulo)
 
