@@ -633,7 +633,7 @@ p.note code{font-family:"IBM Plex Mono",monospace; font-size:11.5px; background:
   var RE_SEPR = /^\s*\|[\s\-:|]+\|\s*$/;
 
   function parse(text){
-    var lines = text.replace(/\r/g,"").split("\n");
+    var lines = normalizarGem(text).split("\n");
     var blocks = [], cur = null, imgCount = 0, qn = 0;
 
     function flush(){ if(cur){ blocks.push(cur); cur = null; } }
@@ -659,7 +659,7 @@ p.note code{font-family:"IBM Plex Mono",monospace; font-size:11.5px; background:
         continue;
       }
       if(/^\s*[-–—_=*]{3,}\s*$/.test(L)){ if(cur) cur.open=false; continue; }
-      if(/^\s*(gabarito|tempo estimado|resposta)\s*:/i.test(L)){ if(cur) cur.open=false; continue; }
+      if(/^\s*(gabarito|tempo estimado|resposta|feedback(?:\s+(?:para|de|do)\s+(?:acerto|erro))?|justificativa|fonte(?:\s+ou\s+recurso\s+complementar)?|recurso\s+complementar)\s*:/i.test(L)){ if(cur) cur.open=false; continue; }
       if((m = L.match(/^\s*QUEST[ÃA]O\s+(\d{1,3})\s*[:.\)\-–]?\s*(.*)$/i))){ openQ(m[1], m[2].trim()); cur.open = !!m[2].trim(); if(!m[2].trim()) cur.parts=[]; continue; }
       if((m = L.match(RE_SEC))){ flush(); blocks.push({type:"sec", t:m[1].trim()}); continue; }
       if(RE_COL.test(L)){ flush(); blocks.push({type:"col"}); continue; }
@@ -1107,7 +1107,7 @@ p.note code{font-family:"IBM Plex Mono",monospace; font-size:11.5px; background:
   /* ---------------- modo de trabalho: prova impressa ou Formulário Google ---------------- */
   // Endereço do web app (Apps Script) que cria o formulário. Preencha uma vez, depois de implantar o Codigo.gs.
   // Enquanto estiver vazio, o campo "Endereço do web app" aparece no painel do modo formulário.
-  var FORMS_URL = "https://script.google.com/a/macros/edutec.sed.ms.gov.br/s/AKfycbw6CfMGhTN7rytgGZerooX0cXN4H1Rh7pVzxqf-G43OLiF2qEyEe7u8AlhosieJoUID/exec";
+  var FORMS_URL = "";
 
   var MODE = "print", OV = {}, FQ = {items:[], warns:{}}, FS = {};
   var MODE_KEY = KEY + "-mode", FORM_KEY = KEY + "-form";
@@ -1139,6 +1139,43 @@ p.note code{font-family:"IBM Plex Mono",monospace; font-size:11.5px; background:
   }
   function saveForm(){ lsSet(FORM_KEY, JSON.stringify({s:FS, ov:OV})); }
 
+  /*NG-START*/
+  /* Normaliza a saída do Laboratório de Questões / Gem (formato "Google Forms") para o padrão do Montador.
+     Texto que já está no padrão passa inalterado. */
+  function normalizarGem(text){
+    var t = String(text).replace(/\r/g,"");
+    var gem = /\[CONFIGURA[ÇC][ÃA]O DO GOOGLE FORMS\]|Tipo no Forms\s*:|Chave de Resposta/i.test(t);
+    if(!gem && !/^\s*[-*]?\s*\[[ xX]?\]\s*\(?[A-Ea-e]\)/m.test(t) && !/feedback\s*\/\s*justificativa|^\s*[-*]?\s*justificativa\s*:/im.test(t)) return t;
+    var L = t.split("\n"), out = [], i, m, started = !gem;
+    function latex(s){
+      return s.replace(/\\frac\s*\{([^{}]*)\}\s*\{([^{}]*)\}/g, "($1)/($2)").replace(/\\cdot/g,"·").replace(/\\times/g,"×")
+              .replace(/\\sqrt\s*\{([^{}]*)\}/g,"√($1)").replace(/\^\{([^{}]*)\}/g,"^($1)").replace(/\\[,;! ]/g," ")
+              .replace(/\\([A-Za-z]+)/g, "$1").replace(/\$([^$\n]+)\$/g, "$1");
+    }
+    for(i=0;i<L.length;i++){
+      var s = L[i];
+      if(!started){ if(/^\s*\W*QUEST[ÃA]O\s+\d/i.test(s)) started = true; else continue; }
+      if(/^\s*\W*\[?RESUMO\b/i.test(s)) break;
+      if(/^\s*[-*•]?\s*(tipo no forms|tipo geral de prova|configura[çc][ãa]o recomendada)\s*:/i.test(s)) continue;
+      if(/^\s*\W*dica de montagem/i.test(s)) continue;
+      if(/^\s*\W*chave de resposta[^\n]*:\s*$/i.test(s)) continue;
+      if(/^\s*[-*•]?\s*op[çc][õo]es\s*:\s*$/i.test(s)) continue;
+      if((m = s.match(/^\s*\W*t[íi]tulo\s*\/\s*enunciado\s*:\s*(.*)$/i))){ if(m[1].trim()) out.push(m[1]); continue; }
+      if((m = s.match(/^\s*[-*•]?\s*\[\s*([xX]?)\s*\]\s*\(?([A-Ea-e])\)?\s*[\)\.\-–]?\s+(.*)$/))){
+        out.push((m[1] ? "*" : "") + m[2].toUpperCase() + ") " + latex(m[3])); continue;
+      }
+      if((m = s.match(/^\s*[-*•]?\s*gabarito\s*:\s*(?:op[çc][ãa]o|alternativa|letra)?\s*\(?([A-Ea-e])\)?\b.*$/i))){
+        out.push("Gabarito: " + m[1].toUpperCase()); continue;
+      }
+      if((m = s.match(/^\s*[-*•]?\s*(?:feedback\s*\/\s*)?justificativa\s*:\s*(.*)$/i))){
+        var f = latex(m[1]); out.push("Feedback para acerto: " + f); out.push("Feedback para erro: " + f); continue;
+      }
+      out.push(latex(s));
+    }
+    return out.join("\n");
+  }
+  /*NG-END*/
+
   /*PF-START*/
   /* Leitura das questões para o formulário. Aceita o formato do Montador (1) A) *B) >) e o do Laboratório de
      Questões (Questão N — Nível — [descritor], Gabarito, Feedback para acerto/erro, Fonte). */
@@ -1146,7 +1183,7 @@ p.note code{font-family:"IBM Plex Mono",monospace; font-size:11.5px; background:
     return String(s).replace(/\*\*/g,"").replace(/\*([^*\n]+)\*/g,"$1").replace(/`/g,"").replace(/[ \t]+/g," ").trim();
   }
   function parseForm(text){
-    var lines = String(text).replace(/\r/g,"").split("\n");
+    var lines = normalizarGem(text).replace(/\r/g,"").split("\n");
     var items = [], cur = null, lastAlt = false;
     var B = {stem:[], kind:null};           // texto-base pendente (> ou tabela antes da questão)
     var imgs = 0, dropped = 0;
