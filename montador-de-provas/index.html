@@ -392,6 +392,7 @@ p.note code{font-family:"IBM Plex Mono",monospace; font-size:11.5px; background:
           <tr><td><code>*B)</code></td><td>Marca a correta. O asterisco não sai na prova, só no gabarito.</td></tr>
           <tr><td><code>&gt;</code></td><td>Texto-base, não numerado. Fica junto da questão seguinte.</td></tr>
           <tr><td><code>##</code></td><td>Título de parte: <code>## Parte I — Física</code></td></tr>
+          <tr><td><code>*negrito*</code><br><code>_itálico_</code><br><code>__sublinhado__</code></td><td>Formatação dentro do texto, como no WhatsApp. Vale no enunciado, nas alternativas e no texto-base, na tela, no PDF e no Word. Para escrever o símbolo mesmo, use <code>\*</code> ou <code>\_</code>. No formulário Google a formatação não existe: os símbolos são retirados.</td></tr>
           <tr><td><code>[IMAGEM]</code></td><td>Reserva a imagem: <code>[IMAGEM:60]</code> = 60% da largura; <code>[IMAGEM:60x80]</code> = 60% da largura e 80 mm de altura. O campo para carregar o arquivo aparece logo abaixo da caixa.</td></tr>
           <tr><td><code>| a | b |</code></td><td>Tabela. A 2ª linha com <code>|---|</code> faz cabeçalho.</td></tr>
           <tr><td><code>[LINHAS:5]</code></td><td>5 linhas pautadas para resposta escrita.</td></tr>
@@ -782,7 +783,7 @@ p.note code{font-family:"IBM Plex Mono",monospace; font-size:11.5px; background:
 
   function spMM(p){ return p.mm!=null ? p.mm : Math.round(p.em*S.fsz*S.lh*0.3528*100)/100; }
   function partHTML(p){
-    if(p.k==="p") return '<div class="basetext" style="text-align:'+S.align+'">'+esc(p.t)+'</div>';
+    if(p.k==="p") return '<div class="basetext" style="text-align:'+S.align+'">'+fmtHTML(p.t)+'</div>';
     if(p.k==="img"){
       var src = IMAGES[p.idx];
       if(src) return '<img class="qimg" style="width:'+p.w+'%;'+(p.h ? 'height:'+p.h+'mm;object-fit:contain' : (AR[p.idx]?'aspect-ratio:'+AR[p.idx]:''))+'" src="'+src+'" alt="">';
@@ -827,13 +828,13 @@ p.note code{font-family:"IBM Plex Mono",monospace; font-size:11.5px; background:
       var body = b.parts.map(function(p,i){
         var h = partHTML(p);
         if(i===0 && p.k==="p") h = '<div class="basetext" style="text-align:'+S.align+'">'+
-          '<span class="num">'+num+'.</span> '+esc(p.t)+"</div>";
+          '<span class="num">'+num+'.</span> '+fmtHTML(p.t)+"</div>";
         return h;
       }).join("");
       if(b.parts.length===0 || b.parts[0].k!=="p") body = '<div class="num">'+num+".</div>"+body;
       var cls = altClass(b.alts);
       var alts = b.alts.length ? '<div class="alts '+cls+'"'+(S.afd ? ' style="font-size:'+(S.fsz+S.afd)+'pt"' : '')+'>'+b.alts.map(function(a){
-        return '<div class="alt"><span>'+a.letter+')</span><span>'+esc(a.t)+"</span></div>";
+        return '<div class="alt"><span>'+a.letter+')</span><span>'+fmtHTML(a.t)+"</span></div>";
       }).join("")+"</div>" : "";
       return '<div class="blk q">'+body+alts+"</div>";
     }
@@ -1245,13 +1246,68 @@ p.note code{font-family:"IBM Plex Mono",monospace; font-size:11.5px; background:
     }
     return out.join("\n");
   }
+  /* Formatação dentro do texto, no estilo do WhatsApp: *negrito*  _itálico_  __sublinhado__  (e **negrito** do Markdown).
+     O marcador só abre depois de espaço, início de linha ou pontuação, e só fecha antes de espaço ou pontuação,
+     então 2*3*4, x_1 e ______ (linha para preencher) continuam como estão. \* e \_ escrevem o símbolo literal. */
+  function inlineRuns(s){
+    s = String(s);
+    var out = [];
+    function push(t, st){
+      if(!t) return;
+      var l = out[out.length-1];
+      if(l && l.b===st.b && l.i===st.i && l.u===st.u) l.t += t; else out.push({t:t, b:st.b, i:st.i, u:st.u});
+    }
+    function walk(a, b, st){
+      var i = a, buf = "";
+      while(i < b){
+        var c = s.charAt(i);
+        if(c==="\\" && i+1<b && /[*_\\]/.test(s.charAt(i+1))){ buf += s.charAt(i+1); i += 2; continue; }
+        if(c==="*" || c==="_"){
+          var len = (s.charAt(i+1)===c && s.charAt(i+2)!==c) ? 2 : 1;
+          var antes = i===a ? "" : s.charAt(i-1);
+          var abreOk = i===a || /[\s(\[{"'“‘«\-–—:;,.\/]/.test(antes);
+          var depois = s.charAt(i+len);
+          if(abreOk && i+len<b && !/\s/.test(depois) && depois!==c){
+            var j = i+len, f = -1, mk = c===" " ? "" : (len===2 ? c+c : c);
+            while(j < b){
+              if(s.charAt(j)==="\\"){ j += 2; continue; }
+              if(s.substr(j, len)===mk && j>i+len && !/\s/.test(s.charAt(j-1))){
+                var nx = s.charAt(j+len);
+                if((j+len>=b || /[\s)\]}"'”’».,;:!?\-–—\/*_]/.test(nx)) && (len===2 || s.charAt(j+1)!==c)){ f = j; break; }
+              }
+              j++;
+            }
+            if(f > 0 && /[A-Za-z0-9À-ÿ]/.test(s.slice(i+len, f))){
+              push(buf, st); buf = "";
+              var ns = {b:st.b, i:st.i, u:st.u};
+              if(c==="*") ns.b = true; else if(len===2) ns.u = true; else ns.i = true;
+              walk(i+len, f, ns);
+              i = f + len; continue;
+            }
+          }
+        }
+        buf += c; i++;
+      }
+      push(buf, st);
+    }
+    walk(0, s.length, {b:false, i:false, u:false});
+    return out;
+  }
+  function semFormato(s){ return inlineRuns(s).map(function(r){ return r.t; }).join(""); }
+  function fmtHTML(s){
+    return inlineRuns(s).map(function(r){
+      var h = esc(r.t);
+      if(r.u) h = "<u>"+h+"</u>"; if(r.i) h = "<i>"+h+"</i>"; if(r.b) h = "<b>"+h+"</b>";
+      return h;
+    }).join("");
+  }
   /*NG-END*/
 
   /*PF-START*/
   /* Leitura das questões para o formulário. Aceita o formato do Montador (1) A) *B) >) e o do Laboratório de
      Questões (Questão N — Nível — [descritor], Gabarito, Feedback para acerto/erro, Fonte). */
   function stripMd(s){
-    return String(s).replace(/\*\*/g,"").replace(/\*([^*\n]+)\*/g,"$1").replace(/`/g,"").replace(/[ \t]+/g," ").trim();
+    return semFormato(String(s)).replace(/`/g,"").replace(/[ \t]+/g," ").trim();
   }
   function parseForm(text){
     var lines = normalizarGem(text).replace(/\r/g,"").split("\n");
@@ -1791,10 +1847,11 @@ p.note code{font-family:"IBM Plex Mono",monospace; font-size:11.5px; background:
 
     // primitivas
     function R(t, o){ o = o||{};
-      var pr = (o.font?'<w:rFonts w:ascii="'+o.font+'" w:hAnsi="'+o.font+'" w:cs="'+o.font+'"/>':"")+(o.b?"<w:b/>":"")+(o.i?"<w:i/>":"")+(o.caps?"<w:caps/>":"")+
+      var pr = (o.font?'<w:rFonts w:ascii="'+o.font+'" w:hAnsi="'+o.font+'" w:cs="'+o.font+'"/>':"")+(o.b?"<w:b/>":"")+(o.i?"<w:i/>":"")+(o.u?'<w:u w:val="single"/>':"")+(o.caps?"<w:caps/>":"")+
                (o.color?'<w:color w:val="'+o.color+'"/>':"")+(o.sz?'<w:sz w:val="'+o.sz+'"/><w:szCs w:val="'+o.sz+'"/>':"");
       return '<w:r>'+(pr?'<w:rPr>'+pr+'</w:rPr>':"")+'<w:t xml:space="preserve">'+xe(t)+'</w:t></w:r>';
     }
+    function RT(t, o){ o = o||{}; return inlineRuns(t).map(function(r){ var q = {}; for(var k in o) q[k] = o[k]; if(r.b) q.b = true; if(r.i) q.i = true; if(r.u) q.u = true; return R(r.t, q); }).join(""); }
     function TAB(o){ return '<w:r>'+(o&&o.sz?'<w:rPr><w:sz w:val="'+o.sz+'"/></w:rPr>':"")+'<w:tab/></w:r>'; }
     function P(runs, o){ o = o||{};
       var pr = (o.keepNext?"<w:keepNext/>":"")+(o.keepLines?"<w:keepLines/>":"")+(o.pageBreakBefore?"<w:pageBreakBefore/>":"")+
@@ -1856,7 +1913,7 @@ p.note code{font-family:"IBM Plex Mono",monospace; font-size:11.5px; background:
     var imgSizes = {};
     for(var k in IMAGES){ if(/^\d+$/.test(k)) imgSizes[k] = await addImage(IMAGES[k]); }
     function partXml(p, ctx){
-      if(p.k==="p") return P(R(p.t,{}), {jc:jcBody, line:lineVal, keepNext:ctx.keepNext, keepLines:true});
+      if(p.k==="p") return P(RT(p.t,{}), {jc:jcBody, line:lineVal, keepNext:ctx.keepNext, keepLines:true});
       if(p.k==="img"){
         var im = imgSizes[p.idx], wmm = colW*p.w/100;
         if(im){ var hmm = wmm/im.ar, hmax = p.h || 150; if(hmm > hmax){ hmm = hmax; wmm = hmm*im.ar; } return P(drawing(im, wmm, hmm), {jc:"center", before:60, after:60, keepNext:ctx.keepNext}); }
@@ -1879,7 +1936,7 @@ p.note code{font-family:"IBM Plex Mono",monospace; font-size:11.5px; background:
       return "";
     }
     var SZA = Math.round((S.fsz+(S.afd||0))*2);
-    function RA(t, o){ o = o||{}; if(S.afd) o.sz = SZA; return R(t, o); }
+    function RA(t, o){ o = o||{}; if(S.afd) o.sz = SZA; return RT(t, o); }
     var first = true;
     blocks.forEach(function(b){
       if(b.type==="col"){ body.push('<w:p><w:r><w:br w:type="column"/></w:r></w:p>'); first = true; return; }
@@ -1895,7 +1952,7 @@ p.note code{font-family:"IBM Plex Mono",monospace; font-size:11.5px; background:
         if(!b.parts.length || b.parts[0].k!=="p") body.push(P(R(num+".",{b:true}),{before:before, keepNext:true}));
         b.parts.forEach(function(p, i){
           var kn = hasAlts || i < b.parts.length-1;
-          if(i===0 && p.k==="p"){ body.push(P(R(num+".",{b:true})+R(" "+p.t,{}), {jc:jcBody, line:lineVal, before:before, keepNext:kn, keepLines:true})); }
+          if(i===0 && p.k==="p"){ body.push(P(R(num+".",{b:true})+RT(" "+p.t,{}), {jc:jcBody, line:lineVal, before:before, keepNext:kn, keepLines:true})); }
           else body.push(partXml(p,{keepNext:kn}));
         });
         if(hasAlts){
