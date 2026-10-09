@@ -75,6 +75,33 @@ button.btn.primary{background:var(--accent); border-color:var(--accent); color:v
 button.btn.primary:hover{filter:brightness(1.08); color:var(--accent-ink)}
 button.btn.ghost{background:transparent}
 
+
+.filemenu{position:relative}
+.filemenu>summary{list-style:none; border:1px solid var(--rule); background:transparent; border-radius:5px; padding:7px 13px; font-size:13px; font-weight:600; cursor:pointer; user-select:none}
+.filemenu>summary::-webkit-details-marker{display:none}
+.filemenu>summary:hover,.filemenu[open]>summary{border-color:var(--accent); color:var(--accent)}
+.filemenu>summary:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+.fmpanel{position:absolute; right:0; top:calc(100% + 6px); z-index:60; width:290px; background:var(--surface); border:1px solid var(--rule); border-radius:8px; box-shadow:var(--shadow); padding:6px; display:flex; flex-direction:column}
+.fmpanel button{text-align:left; border:0; background:none; border-radius:6px; padding:9px 10px; font:inherit; font-size:13px; font-weight:600; color:var(--ink); cursor:pointer}
+.fmpanel button:hover,.fmpanel button:focus-visible{background:var(--accent-soft); outline:none}
+.fmpanel small{display:block; margin-top:2px; font-weight:400; font-size:11.5px; color:var(--ink-3)}
+.libscreen{position:fixed; inset:0; z-index:90; background:rgba(15,20,40,.45); display:flex; align-items:center; justify-content:center; padding:16px}
+.libscreen[hidden]{display:none}
+.libbox{background:var(--paper); border:1px solid var(--rule); border-radius:12px; box-shadow:var(--shadow); width:100%; max-width:720px; max-height:88vh; display:flex; flex-direction:column; padding:18px 20px}
+.libhead{display:flex; align-items:center; justify-content:space-between; gap:12px}
+.libhead h2{margin:0; font-size:18px}
+.libnote{margin:8px 0 12px; font-size:13px; color:var(--ink-2); line-height:1.5}
+.libsave{display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px}
+.libsave input{flex:1 1 200px; min-width:0; padding:8px 10px; border:1px solid var(--rule); border-radius:5px; font:inherit; font-size:13px; background:var(--surface); color:var(--ink)}
+.liblist{overflow:auto; display:flex; flex-direction:column; gap:8px; padding-right:2px}
+.librow{display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; padding:10px 12px; background:var(--surface); border:1px solid var(--rule); border-radius:8px}
+.librow.cur{border-color:var(--accent); box-shadow:0 0 0 2px var(--accent-soft)}
+.libinfo{min-width:0; flex:1 1 220px}
+.libinfo b{display:block; font-size:14px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.libinfo small{color:var(--ink-3); font-size:12px}
+.libbtns{display:flex; gap:6px}
+.libempty{color:var(--ink-3); font-size:13px; margin:6px 0}
+@media print{ .filemenu,.libscreen{display:none !important} }
 .layout{display:grid; grid-template-columns:minmax(300px,330px) 1fr; align-items:start}
 @media (max-width:900px){ .layout{grid-template-columns:1fr} }
 
@@ -311,6 +338,18 @@ p.note code{font-family:"IBM Plex Mono",monospace; font-size:11.5px; background:
     <button type="button" class="btn ghost modecancel" id="modeCancel" hidden>Continuar no modo atual</button>
   </div>
 </div>
+<div class="libscreen" id="libScreen" hidden>
+  <div class="libbox" role="dialog" aria-modal="true" aria-labelledby="libTitle">
+    <div class="libhead"><h2 id="libTitle">Minhas provas</h2><button type="button" class="btn ghost" id="libClose">Fechar</button></div>
+    <p class="libnote">As provas ficam guardadas <b>neste navegador, neste computador</b>. Para levar a outro computador ou enviar a um colega, use <b>Baixar</b>; quem receber usa <b>Importar arquivo</b>, e vem tudo junto: questões, imagens e configurações.</p>
+    <div class="libsave">
+      <input type="text" id="libName" maxlength="80" placeholder="Nome da prova">
+      <button type="button" class="btn primary" id="libSave">Guardar a prova atual</button>
+      <button type="button" class="btn" id="libImport">Importar arquivo (.json)</button>
+    </div>
+    <div id="libList" class="liblist"></div>
+  </div>
+</div>
 <div class="topbar">
   <div class="brand">
     <a href="../" class="back" aria-label="Voltar às ferramentas" style="font-size:12.5px;font-weight:600;color:var(--accent);text-decoration:none;white-space:nowrap">← Ferramentas</a>
@@ -318,6 +357,15 @@ p.note code{font-family:"IBM Plex Mono",monospace; font-size:11.5px; background:
     <span class="sub">EEJM · Campo Grande/MS</span>
   </div>
   <div class="actions">
+    <details class="filemenu" id="fileMenu">
+      <summary>Prova &#9662;</summary>
+      <div class="fmpanel">
+        <button type="button" id="fmNew">Nova prova<small>Guarda a atual e limpa; mantém professor e componente.</small></button>
+        <button type="button" id="fmLib">Minhas provas<small>Provas guardadas neste computador; importe um arquivo de outro professor.</small></button>
+        <button type="button" id="fmSave">Baixar esta prova (.json)<small>Arquivo para guardar ou enviar a outro professor.</small></button>
+      </div>
+    </details>
+    <input type="file" id="openFile" accept=".json,application/json" hidden>
     <button class="btn ghost" id="btnMode" type="button">Trocar modo</button>
     <button class="btn ghost" id="btnTheme" type="button">Tema</button>
     <button class="btn only-print" id="btnFit" type="button">Ajustar às folhas</button>
@@ -1462,6 +1510,197 @@ p.note code{font-family:"IBM Plex Mono",monospace; font-size:11.5px; background:
   $("modePrint").addEventListener("click", function(){ chooseMode("print"); });
   $("modeForm").addEventListener("click", function(){ chooseMode("form"); });
   $("modeCancel").addEventListener("click", function(){ $("modeScreen").hidden = true; });
+  /* ---------------- provas: salvar, biblioteca no computador, arquivo .json, nova prova ---------------- */
+  var FILE_APP = "montador-de-provas", FILE_V = 1, LIB_KEY = KEY + "-lib", LIB_MAX = 60, curId = null;
+  var RE_DATAIMG = /^data:image\/(png|jpeg|jpg|gif|webp);base64,[A-Za-z0-9+\/=]+$/;
+
+  function limparImagensNumeradas(){
+    Object.keys(IMAGES).forEach(function(k){ if(/^\d+$/.test(k)) delete IMAGES[k]; });
+    Object.keys(AR).forEach(function(k){ if(/^\d+$/.test(k)) delete AR[k]; });
+  }
+  function slug(s){
+    return String(s||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^a-z0-9]+/g,"-").replace(/^-+|-+$/g,"").slice(0,40);
+  }
+  function baixarTexto(nome, texto, tipo){
+    var blob = new Blob([texto], {type: tipo}), url = URL.createObjectURL(blob), a = document.createElement("a");
+    a.href = url; a.download = nome; document.body.appendChild(a); a.click();
+    setTimeout(function(){ document.body.removeChild(a); URL.revokeObjectURL(url); }, 1500);
+  }
+  function contaQuestoes(t){ return (String(t).match(/^\s*(\d{1,3}\s*[\)\.\-–]\s|QUEST[ÃA]O\s+\d)/gim) || []).length; }
+  function nomePadrao(){ return (S.h3||"").trim() || (S.comp||"").trim() || "Prova sem título"; }
+
+  // reúne tudo o que define a prova atual
+  function coletarProva(){
+    readUI(); readForm();
+    var imgs = {};
+    Object.keys(IMAGES).forEach(function(k){ if(/^\d+$/.test(k) && IMAGES[k]) imgs[k] = IMAGES[k]; });
+    return {app:FILE_APP, v:FILE_V, salvoEm:new Date().toISOString(), modo:MODE,
+            texto:$("src").value, s:JSON.parse(JSON.stringify(S)), form:JSON.parse(JSON.stringify(FS)), ov:JSON.parse(JSON.stringify(OV)), imagens:imgs};
+  }
+
+  // aplica uma prova: copia só campos conhecidos, com o tipo certo
+  function aplicarProva(d){
+    limparImagensNumeradas();
+    var imgs = d.imagens || {};
+    Object.keys(imgs).forEach(function(k){
+      if(/^\d{1,2}$/.test(k) && typeof imgs[k]==="string" && RE_DATAIMG.test(imgs[k])){ IMAGES[k] = imgs[k]; loadAR(k, imgs[k], render); }
+    });
+    var s = (d.s && typeof d.s==="object") ? d.s : {};
+    Object.keys(fields).forEach(function(k){
+      var v = s[k]; if(v===undefined || v===null) return;
+      if(fields[k]==="b") S[k] = !!v;
+      else if(fields[k]==="n"){ if(isFinite(parseFloat(v))) S[k] = parseFloat(v); }
+      else S[k] = String(v).slice(0, 4000);
+    });
+    if(s.cols===1 || s.cols===2) S.cols = s.cols;
+    FS = {}; OV = {};
+    var f = (d.form && typeof d.form==="object") ? d.form : {};
+    Object.keys(FF).forEach(function(k){
+      var v = f[k]; if(v===undefined || v===null) return;
+      if(FF[k]==="b") FS[k] = !!v; else if(FF[k]==="n"){ if(isFinite(parseFloat(v))) FS[k] = parseFloat(v); } else FS[k] = String(v).slice(0, 4000);
+    });
+    var ov = (d.ov && typeof d.ov==="object") ? d.ov : {};
+    Object.keys(ov).forEach(function(k){ if(/^\d{1,3}$/.test(k) && Number.isInteger(ov[k]) && ov[k]>=0 && ov[k]<10) OV[k] = ov[k]; });
+    $("src").value = String(d.texto).slice(0, 400000);
+    writeUI(); writeForm();
+    var m = d.modo==="form" ? "form" : "print";
+    applyMode(m); lsSet(MODE_KEY, m);
+    render();
+  }
+
+  /* ----- biblioteca (guardada neste navegador) ----- */
+  function libLer(){
+    try{ var a = JSON.parse(lsGet(LIB_KEY) || "[]"); return Array.isArray(a) ? a.filter(function(e){ return e && e.id && e.d && typeof e.d.texto==="string"; }) : []; }
+    catch(e){ return []; }
+  }
+  function libGravar(a){
+    try{ localStorage.setItem(LIB_KEY, JSON.stringify(a)); return true; }
+    catch(e){ alert("O navegador não tem mais espaço para guardar provas (imagens grandes ocupam bastante). Baixe esta prova como arquivo e apague alguma antiga em Minhas provas."); return false; }
+  }
+  function novoId(){ return "p" + Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
+
+  // guarda a prova atual; devolve true se gravou
+  function libSalvar(nome, quieto){
+    var d = coletarProva();
+    var lib = libLer(), id = curId, ent = null, i;
+    for(i=0;i<lib.length;i++) if(lib[i].id===id){ ent = lib[i]; break; }
+    if(!ent){
+      for(i=0;i<lib.length;i++) if(lib[i].d.texto===d.texto){ if(quieto) return true; }   // já está guardada igualzinha
+      ent = {id:novoId()}; lib.unshift(ent);
+    }
+    ent.nome = (nome || ent.nome || nomePadrao()).trim().slice(0, 80);
+    ent.quando = d.salvoEm; ent.q = contaQuestoes(d.texto); ent.d = d;
+    lib.sort(function(a,b){ return a.quando < b.quando ? 1 : -1; });
+    if(lib.length > LIB_MAX) lib = lib.slice(0, LIB_MAX);
+    if(!libGravar(lib)) return false;
+    curId = ent.id;
+    return true;
+  }
+  // antes de trocar a tela por outra prova, guarda a que está nela (nada se perde)
+  function guardarAtualSeHouver(){
+    if(!$("src").value.trim()) return true;
+    return libSalvar(null, true);
+  }
+
+  function dataBR(iso){
+    var d = new Date(iso); if(isNaN(d)) return "";
+    var p = function(n){ return (n<10?"0":"")+n; };
+    return p(d.getDate())+"/"+p(d.getMonth()+1)+"/"+d.getFullYear()+" "+p(d.getHours())+":"+p(d.getMinutes());
+  }
+
+  function libRender(){
+    var lib = libLer(), box = $("libList");
+    if(!lib.length){ box.innerHTML = '<p class="libempty">Nenhuma prova guardada ainda. Use "Guardar a prova atual" ou importe um arquivo.</p>'; return; }
+    box.innerHTML = lib.map(function(e){
+      return '<div class="librow'+(e.id===curId?' cur':'')+'" data-id="'+esc(e.id)+'">'+
+        '<div class="libinfo"><b>'+esc(e.nome||"Prova")+'</b><small>'+(e.q||0)+' questão(ões) · '+(e.d.modo==="form"?"formulário":"impressa")+' · '+esc(dataBR(e.quando))+(e.id===curId?' · aberta agora':'')+'</small></div>'+
+        '<div class="libbtns"><button type="button" class="btn" data-a="open">Abrir</button>'+
+        '<button type="button" class="btn ghost" data-a="dl">Baixar</button>'+
+        '<button type="button" class="btn ghost" data-a="del">Excluir</button></div></div>';
+    }).join("");
+  }
+  function libAbrirTela(){
+    $("libName").value = nomePadrao();
+    libRender();
+    $("libScreen").hidden = false;
+    try{ $("libName").focus({preventScroll:true}); $("libName").select(); }catch(e){}
+  }
+  function libFechar(){ $("libScreen").hidden = true; }
+
+  function baixarProva(d, nome){
+    baixarTexto("prova-" + (slug(nome) || "sem-titulo") + "-" + String(d.salvoEm||new Date().toISOString()).slice(0,10) + ".json", JSON.stringify(d), "application/json");
+  }
+
+  function importarArquivo(file){
+    if(!file) return;
+    var fr = new FileReader();
+    fr.onload = function(){
+      var d = null;
+      try{ d = JSON.parse(fr.result); }catch(e){}
+      if(!d || d.app!==FILE_APP || typeof d.texto!=="string"){
+        alert("Esse arquivo não parece uma prova baixada por este aplicativo."); return;
+      }
+      if(!guardarAtualSeHouver()) return;
+      aplicarProva(d);
+      curId = null;
+      var nome = ((d.s && d.s.h3) || (d.s && d.s.comp) || "").toString().trim() || file.name.replace(/\.json$/i,"") || "Prova importada";
+      if(libSalvar(nome, false)){ libRender(); }
+      libFechar();
+    };
+    fr.onerror = function(){ alert("Não consegui ler o arquivo."); };
+    fr.readAsText(file);
+  }
+
+  // nova prova: guarda a atual em Minhas provas, apaga o que é da prova e mantém o que é do professor
+  function novaProva(){
+    if(!confirm("Começar uma nova prova?\n\nA prova que está na tela é guardada em Minhas provas antes de limpar.\nSão limpos: questões, imagens, título, turma, valor, conteúdo e título do formulário.\nFicam: escola, professor, componente, orientações, rodapé, logos, formato da folha e lista de turmas do formulário.")) return;
+    if(!guardarAtualSeHouver()) return;
+    $("src").value = "";
+    limparImagensNumeradas();
+    OV = {}; curId = null;
+    ["h3","turma","valor","conteudo"].forEach(function(id){ var el = $(id); if(el) el.value = ""; });
+    var ft = $("ftitulo"); if(ft) ft.value = "";
+    readUI(); readForm();
+    render();
+    try{ $("src").focus({preventScroll:true}); }catch(e){}
+  }
+
+  /* menu "Prova" e janela "Minhas provas" */
+  (function(){
+    var menu = $("fileMenu");
+    function fechar(){ menu.open = false; }
+    document.addEventListener("click", function(e){ if(menu.open && !menu.contains(e.target)) fechar(); });
+    document.addEventListener("keydown", function(e){ if(e.key==="Escape"){ fechar(); libFechar(); } });
+    $("fmNew").addEventListener("click", function(){ fechar(); novaProva(); });
+    $("fmLib").addEventListener("click", function(){ fechar(); libAbrirTela(); });
+    $("fmSave").addEventListener("click", function(){ fechar(); var d = coletarProva(); baixarProva(d, nomePadrao()); });
+    $("libClose").addEventListener("click", libFechar);
+    $("libScreen").addEventListener("click", function(e){ if(e.target===$("libScreen")) libFechar(); });
+    $("libSave").addEventListener("click", function(){
+      if(!$("src").value.trim() && !confirm("A caixa de questões está vazia. Guardar só as configurações?")) return;
+      if(libSalvar($("libName").value, false)) libRender();
+    });
+    $("libImport").addEventListener("click", function(){ $("openFile").value = ""; $("openFile").click(); });
+    $("openFile").addEventListener("change", function(){ importarArquivo(this.files && this.files[0]); });
+    $("libList").addEventListener("click", function(e){
+      var b = e.target.closest("button[data-a]"); if(!b) return;
+      var row = b.closest(".librow"), id = row.getAttribute("data-id"), lib = libLer(), ent = null;
+      for(var i=0;i<lib.length;i++) if(lib[i].id===id) ent = lib[i];
+      if(!ent) return;
+      var a = b.getAttribute("data-a");
+      if(a==="open"){
+        if(id!==curId && !guardarAtualSeHouver()) return;
+        aplicarProva(ent.d); curId = id; libFechar();
+      } else if(a==="dl"){
+        baixarProva(ent.d, ent.nome);
+      } else if(a==="del"){
+        if(!confirm('Excluir "'+(ent.nome||"Prova")+'" de Minhas provas? Isso não pode ser desfeito.')) return;
+        lib = lib.filter(function(x){ return x.id!==id; });
+        if(libGravar(lib)){ if(curId===id) curId = null; libRender(); }
+      }
+    });
+  })();
+
   $("btnMode").addEventListener("click", function(){ showChooser(true); });
   document.addEventListener("keydown", function(e){
     if(e.key==="Escape" && !$("modeScreen").hidden && !$("modeCancel").hidden) $("modeScreen").hidden = true;
