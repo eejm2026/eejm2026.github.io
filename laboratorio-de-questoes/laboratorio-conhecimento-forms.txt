@@ -61,6 +61,7 @@ Regras do modelo impresso:
 - `1)`, `2)`… iniciam a questão; o Montador renumera sozinho.
 - `> ` é texto-base e fica junto da questão seguinte. Se o mesmo texto serve a várias questões, escreva-o uma vez antes da primeira.
 - `[IMAGEM:55]` reserva a figura (o número é a largura em % da coluna; use 40 a 70). Nas notas fora do bloco, descreva cada imagem **na ordem em que aparece**: "Imagem 1: o que deve conter + descrição alternativa" (R11).
+- `[REF: AUTOR, Obra, ano, p. X]` em linha própria, logo depois do texto-base, imprime a referência em letra menor, alinhada à direita. Use sempre que citar um autor, livro, site ou reportagem. Texto puro dentro dos colchetes, sem negrito. No Forms a referência entra como uma linha do enunciado.
 - `| a | b |` com segunda linha `|---|---|` é tabela. `[LINHAS:n]` abre linhas pautadas; `[ESPACO:mm]` deixa espaço para cálculo.
 - `[COLUNA]` e `[QUEBRA]` só se o professor pedir.
 - O gabarito é o asterisco: o Montador gera a folha do professor sozinho. Questões de múltipla escolha sempre têm exatamente um asterisco.
