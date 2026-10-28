@@ -209,6 +209,7 @@ details.help code{font-family:"IBM Plex Mono",monospace; font-size:11.5px; backg
 .sectiontitle{font-weight:700; text-align:center; text-transform:uppercase; letter-spacing:.04em; margin:.2em 0 .4em}
 .basetext{text-align:justify}
 .basetext .src{display:block; text-align:right; font-style:italic}
+.refline{font-size:.82em; text-align:right; line-height:1.2; margin:.1em 0 .2em}
 
 /* cabeçalho compacto */
 .hd{border:.8pt solid #000; margin-bottom:3mm; font-size:9.5pt; line-height:1.25; font-family:Arial,Helvetica,sans-serif; color:#000}
@@ -395,6 +396,7 @@ p.note code{font-family:"IBM Plex Mono",monospace; font-size:11.5px; background:
           <tr><td><code>*negrito*</code><br><code>_itálico_</code><br><code>__sublinhado__</code></td><td>Formatação dentro do texto, como no WhatsApp. Vale no enunciado, nas alternativas e no texto-base, na tela, no PDF e no Word. Para escrever o símbolo mesmo, use <code>\*</code> ou <code>\_</code>. No formulário Google a formatação não existe: os símbolos são retirados.</td></tr>
           <tr><td><code>[IMAGEM]</code></td><td>Reserva a imagem: <code>[IMAGEM:60]</code> = 60% da largura; <code>[IMAGEM:60x80]</code> = 60% da largura e 80 mm de altura. O campo para carregar o arquivo aparece logo abaixo da caixa.</td></tr>
           <tr><td><code>| a | b |</code></td><td>Tabela. A 2ª linha com <code>|---|</code> faz cabeçalho.</td></tr>
+          <tr><td><code>[REF: texto]</code></td><td>Referência ou fonte em letra menor, alinhada à direita. Vale também <code>[FONTE: ...]</code>. Escreva logo depois do texto-base: <code>[REF: SILVA, 2020, p. 15]</code>. Dentro dele, <code>*negrito*</code> e <code>_itálico_</code> funcionam.</td></tr>
           <tr><td><code>[LINHAS:5]</code></td><td>5 linhas pautadas para resposta escrita.</td></tr>
           <tr><td><code>[ESPACO:30]</code></td><td>30 mm em branco para cálculo.</td></tr>
           <tr><td><code>[COLUNA]</code></td><td>Força o início de uma nova coluna.</td></tr>
@@ -411,6 +413,7 @@ p.note code{font-family:"IBM Plex Mono",monospace; font-size:11.5px; background:
           <tr><td><code>Fonte:</code></td><td>Link complementar do feedback, em <code>[texto](https://...)</code> ou só o endereço.</td></tr>
           <tr><td><code>&gt;</code></td><td>Texto-base. Fica junto do enunciado, com as quebras de linha preservadas.</td></tr>
           <tr><td><code>##</code></td><td>Título de seção do formulário.</td></tr>
+          <tr><td><code>[REF: texto]</code></td><td>Referência ou fonte do texto-base. No formulário entra como uma linha própria no enunciado.</td></tr>
           <tr><td><code>[LINHAS:5]</code></td><td>Questão sem alternativas vira resposta em texto, sem nota automática.</td></tr>
           <tr><td><code>&gt;</code> sozinho</td><td>Prova impressa: uma linha em branco. Para espaços maiores use <code>[ESPACO:20]</code> (20 mm).</td></tr>
           <tr><td>Texto-base <code>&gt;</code> antes da questão</td><td>Vira uma página própria no formulário (título, texto e a imagem que você inserir lá), e as questões seguintes ficam nela.</td></tr>
@@ -684,6 +687,7 @@ p.note code{font-family:"IBM Plex Mono",monospace; font-size:11.5px; background:
   var RE_Q    = /^\s*(\d{1,3})\s*[\)\.\-–]\s+(.*)$/;
   var RE_ALT  = /^\s*(\*?)\s*\(?([A-Ea-e])\)?\s*[\)\.\-–]\s+(.*)$/;
   var RE_IMG  = /^\s*\[IMAGEM(?::\s*(\d{1,3})?(?:\s*[xX]\s*(\d{1,3}))?)?\s*\]\s*$/i;
+  var RE_REF  = /^\s*\[(?:REF|FONTE|CITA[ÇC][ÃA]O)\s*:\s*(.+?)\s*\]\s*$/i;
   var RE_LIN  = /^\s*\[LINHAS:\s*(\d{1,2})\]\s*$/i;
   var RE_ESP  = /^\s*\[ESPACO:\s*(\d{1,3})\]\s*$/i;
   var RE_COL  = /^\s*\[COLUNA\]\s*$/i;
@@ -747,6 +751,7 @@ p.note code{font-family:"IBM Plex Mono",monospace; font-size:11.5px; background:
       }
       if((m = L.match(RE_IMG))){ imgCount++;
         addPart({k:"img", idx:imgCount, w: m[1]?parseInt(m[1],10):100, h: m[2]?parseInt(m[2],10):0 }); cur.open=false; continue; }
+      if((m = L.match(RE_REF))){ addPart({k:"ref", t:m[1].trim()}); cur.open=false; continue; }
       if((m = L.match(RE_LIN))){ addPart({k:"lines", n:parseInt(m[1],10)}); cur.open=false; continue; }
       if((m = L.match(RE_ESP))){ addPart({k:"space", mm:parseInt(m[1],10)}); cur.open=false; continue; }
       if(RE_TR.test(L)){
@@ -790,6 +795,7 @@ p.note code{font-family:"IBM Plex Mono",monospace; font-size:11.5px; background:
       return '<div class="qimg" style="width:'+p.w+'%;height:'+(p.h||30)+'mm;border:.5pt dashed #777;display:flex;'+
              'align-items:center;justify-content:center;font-size:.8em;color:#555">Imagem '+p.idx+'</div>';
     }
+    if(p.k==="ref") return '<div class="refline">'+fmtHTML(p.t)+'</div>';
     if(p.k==="lines"){
       var h = ""; for(var i=0;i<p.n;i++) h += "<div></div>";
       return '<div class="lines">'+h+'</div>';
@@ -1382,6 +1388,7 @@ p.note code{font-family:"IBM Plex Mono",monospace; font-size:11.5px; background:
       if((m = L.match(/^\s*##\s+(.*)$/))){ finish(); B.stem = []; B.img = false; items.push({tipo:"secao", titulo:stripMd(m[1])}); continue; }
       if(/^\s*\[(COLUNA|QUEBRA)\]\s*$/i.test(L) || /^\s*\[ESPACO:\s*\d+\]\s*$/i.test(L)) continue;
       if(/^\s*>\s*$/.test(L)) continue;     // '>' vazio = linha em branco na prova impressa; no formulario nao faz nada
+      if((m = L.match(/^\s*\[(?:REF|FONTE|CITA[ÇC][ÃA]O)\s*:\s*(.+?)\s*\]\s*$/i))){ add((cur && !cur.alts.length) ? cur : B, "q", stripMd(m[1])); continue; }
       if(/^\s*\[IMAGEM(?::\s*(?:\d{1,3})?(?:\s*[xX]\s*\d{1,3})?)?\s*\]\s*$/i.test(L)){ imgs++; if(B.stem.length) B.img = true; else if(cur) cur.img = true; continue; }
       if((m = L.match(/^\s*\[LINHAS:\s*\d+\]\s*$/i))){ if(cur) cur.lines = true; continue; }
 
@@ -1919,6 +1926,7 @@ p.note code{font-family:"IBM Plex Mono",monospace; font-size:11.5px; background:
         if(im){ var hmm = wmm/im.ar, hmax = p.h || 150; if(hmm > hmax){ hmm = hmax; wmm = hmm*im.ar; } return P(drawing(im, wmm, hmm), {jc:"center", before:60, after:60, keepNext:ctx.keepNext}); }
         return '<w:tbl><w:tblPr><w:tblW w:w="'+tw(wmm)+'" w:type="dxa"/><w:jc w:val="center"/><w:tblBorders><w:top w:val="dashed" w:sz="4" w:space="0" w:color="777777"/><w:left w:val="dashed" w:sz="4" w:space="0" w:color="777777"/><w:bottom w:val="dashed" w:sz="4" w:space="0" w:color="777777"/><w:right w:val="dashed" w:sz="4" w:space="0" w:color="777777"/></w:tblBorders><w:tblLayout w:type="fixed"/></w:tblPr><w:tblGrid><w:gridCol w:w="'+tw(wmm)+'"/></w:tblGrid><w:tr><w:trPr><w:trHeight w:val="'+tw(p.h||30)+'" w:hRule="atLeast"/></w:trPr><w:tc><w:tcPr><w:tcW w:w="'+tw(wmm)+'" w:type="dxa"/><w:vAlign w:val="center"/></w:tcPr>'+P(R("[Imagem "+p.idx+" — inserir aqui]",{color:"666666"}),{jc:"center"})+'</w:tc></w:tr></w:tbl>'+P("",{line:60,lineRule:"exact"});
       }
+      if(p.k==="ref") return P(RT(p.t,{sz:Math.round(SZ*0.82)}), {jc:"right", line:Math.round(lineVal*0.95), keepNext:ctx.keepNext, keepLines:true});
       if(p.k==="lines"){ var s=""; for(var i=0;i<p.n;i++) s += P("",{line:Math.round(SZ*10*1.95),lineRule:"exact",bdrBottom:4,bdrColor:"555555"}); return s; }
       if(p.k==="space") return P("",{line:tw(spMM(p)),lineRule:"exact"});
       if(p.k==="table"){
