@@ -1297,9 +1297,12 @@ p.note code{font-family:"IBM Plex Mono",monospace; font-size:11.5px; background:
     return out;
   }
   function semFormato(s){ return inlineRuns(s).map(function(r){ return r.t; }).join(""); }
+  /* Caixa de marcar V/F: "( )" vira "(" + 2 espaços-em + ")". O espaço-em não é esticado pela justificação
+     (o espaço comum é), então todos os parênteses ficam com a mesma largura. */
+  var RE_CAIXA = /\([ \t\u2003]*\)/g, CAIXA = "(\u2003\u2003)";
   function fmtHTML(s){
     return inlineRuns(s).map(function(r){
-      var h = esc(r.t);
+      var h = esc(r.t).replace(RE_CAIXA, '<span style="display:inline-block;white-space:pre">'+CAIXA+'</span>');
       if(r.u) h = "<u>"+h+"</u>"; if(r.i) h = "<i>"+h+"</i>"; if(r.b) h = "<b>"+h+"</b>";
       return h;
     }).join("");
@@ -1854,7 +1857,7 @@ p.note code{font-family:"IBM Plex Mono",monospace; font-size:11.5px; background:
                (o.color?'<w:color w:val="'+o.color+'"/>':"")+(o.sz?'<w:sz w:val="'+o.sz+'"/><w:szCs w:val="'+o.sz+'"/>':"");
       return '<w:r>'+(pr?'<w:rPr>'+pr+'</w:rPr>':"")+'<w:t xml:space="preserve">'+xe(t)+'</w:t></w:r>';
     }
-    function RT(t, o){ o = o||{}; return inlineRuns(t).map(function(r){ var q = {}; for(var k in o) q[k] = o[k]; if(r.b) q.b = true; if(r.i) q.i = true; if(r.u) q.u = true; return R(r.t, q); }).join(""); }
+    function RT(t, o){ o = o||{}; return inlineRuns(t).map(function(r){ var q = {}; for(var k in o) q[k] = o[k]; if(r.b) q.b = true; if(r.i) q.i = true; if(r.u) q.u = true; return R(r.t.replace(RE_CAIXA, CAIXA), q); }).join(""); }
     function TAB(o){ return '<w:r>'+(o&&o.sz?'<w:rPr><w:sz w:val="'+o.sz+'"/></w:rPr>':"")+'<w:tab/></w:r>'; }
     function P(runs, o){ o = o||{};
       var pr = (o.keepNext?"<w:keepNext/>":"")+(o.keepLines?"<w:keepLines/>":"")+(o.pageBreakBefore?"<w:pageBreakBefore/>":"")+
